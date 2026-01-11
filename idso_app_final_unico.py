@@ -1,0 +1,1356 @@
+import hashlib
+import base64
+import json
+from io import BytesIO
+from zipfile import ZipFile, ZIP_DEFLATED
+from datetime import datetime, date
+
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+# ======================================================
+# CARREGAMENTO DA FONTE (AJUSTE NECESSÁRIO)
+# ======================================================
+def load_font_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+brighter_base64 = load_font_base64("fonts/Brighter-Regular.otf")
+
+# ======================================================
+# CONFIGURAÇÕES
+# ======================================================
+APP_TITLE = "Indicadores de Desempenho da Segurança Operacional – IDSO"
+ACCENT = "#96CE00"  # cor institucional
+
+st.set_page_config(page_title="IDSO • Painel", layout="wide")
+
+# ======================================================
+# CSS – LAYOUT “LIMPO” (SEM SOBRA DE SIDEBAR) + ESTILO BONITO
+# ======================================================
+st.markdown(
+    f"""
+    <style>
+
+    /* ======================================================
+       FONTE BRIGHTER (AJUSTE ÚNICO)
+       ====================================================== */
+    @font-face {{
+        font-family: 'Brighter';
+        src: url(data:font/opentype;base64,{brighter_base64}) format('opentype');
+        font-weight: normal;
+        font-style: normal;
+    }}
+
+    html, body, [class*="css"] {{
+        font-family: 'Brighter', Arial, sans-serif !important;
+    }}
+
+    /* ======================================================
+       AJUSTE DA FONTE DO FILE UPLOADER (REMOVE CURSIVA)
+       ====================================================== */
+    [data-testid="stFileUploader"] *,   
+    [data-testid="stFileUploader"] * {{
+        font-family: system-ui, -apple-system, BlinkMacSystemFont,
+                    "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        font-style: normal !important;
+        font-weight: normal !important;
+    }}
+
+    /* Remove qualquer “sobra” da sidebar */
+    [data-testid="stSidebar"] {{
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+    }}
+    section[data-testid="stSidebarContent"] {{
+        display: none !important;
+    }}
+
+    /* Remove header/footer do Streamlit */
+    header, footer {{ visibility: hidden; height: 0px; }}
+
+    /* Ajusta container principal */
+    div.block-container {{
+        padding-top: 1.0rem;
+        padding-left: 2.0rem;
+        padding-right: 2.0rem;
+        max-width: 1500px;
+    }}
+
+    /* Chips (multiselect) */
+    [data-baseweb="tag"] {{
+        background-color: {ACCENT} !important;
+        color: #ffffff !important;
+        border-radius: 999px !important;
+        font-weight: 900 !important;
+        border: 1px solid rgba(0,0,0,0.12) !important;
+    }}
+    [data-baseweb="tag"] svg {{ color: #ffffff !important; }}
+
+    /* Cards KPI */
+    .kpi-card {{
+        background-color:#f2f3f5;
+        padding:16px;
+        border-radius:16px;
+        text-align:center;
+        border: 1px solid rgba(0,0,0,0.07);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+    }}
+    .kpi-title {{
+        font-size:16px;
+        font-weight:900;
+        margin-bottom:6px;
+        color:#1a2732;
+    }}
+    .kpi-value {{
+        font-size:34px;
+        font-weight:1000;
+        line-height:1.1;
+    }}
+    .kpi-sub {{
+        font-size:13px;
+        margin-top:6px;
+        font-weight:800;
+        color:#5b6b7b;
+    }}
+
+    /* Banner estatístico */
+    .stat-banner {{
+        background: linear-gradient(90deg, #233243 0%, #2c3e50 55%, #233243 100%);
+        color: white;
+        padding: 14px 18px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.10);
+        margin-top: 8px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    }}
+    .stat-title {{
+        text-align:center;
+        font-weight:1000;
+        letter-spacing: 0.5px;
+        margin-bottom: 10px;
+        font-size: 18px;
+    }}
+    .stat-line {{
+        text-align:center;
+        font-weight:900;
+        font-size: 16px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }}
+    .up {{ color: {ACCENT}; font-weight: 1000; }}
+    .down {{ color: #ff5a5f; font-weight: 1000; }}
+    .flat {{ color: #d0d7de; font-weight: 1000; }}
+
+    /* Pendências com pisca */
+    @keyframes blinkRed {{
+        0%   {{ box-shadow: 0 0 0 rgba(255,0,0,0.0); background:#ffe9ea; }}
+        50%  {{ box-shadow: 0 0 18px rgba(255,0,0,0.35); background:#ffd6d9; }}
+        100% {{ box-shadow: 0 0 0 rgba(255,0,0,0.0); background:#ffe9ea; }}
+    }}
+    .pending-card {{
+        border-radius:16px;
+        border: 1px solid rgba(155,28,28,0.20);
+        padding: 12px 14px;
+        animation: blinkRed 1.2s infinite;
+        margin-bottom: 10px;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+    }}
+
+    /* ======================================================
+       RANKING – TOP EVENTOS POR INDICADOR (MINI CARDS)
+       ====================================================== */
+    .rank-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 14px;
+        margin-top: 12px;
+        margin-bottom: 20px;
+    }}
+
+    .rank-card-mini {{
+        background: #f8f9fb;
+        border: 2px solid {ACCENT};
+        border-radius: 14px;
+        padding: 12px 10px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }}
+
+    .rank-pos {{
+        font-size: 11px;
+        font-weight: 900;
+        color: #6b7c93;
+    }}
+
+    .rank-aero {{
+        font-size: 17px;
+        font-weight: 1000;
+        margin-top: 4px;
+        color: #1a2732;
+        letter-spacing: 0.4px;
+    }}
+
+    .rank-value {{
+        font-size: 22px;
+        font-weight: 1000;
+        margin-top: 6px;
+        color: #1a2732;
+        line-height: 1.1;
+    }}
+
+    .rank-label {{
+        font-size: 11px;
+        font-weight: 900;
+        color: #6b7c93;
+    }}
+
+    /* ======================================================
+       🔥 INCLUSÕES — DESTAQUES DE RANKING
+       ====================================================== */
+
+    .rank-top-1 {{
+        background: linear-gradient(135deg, #fff4cc, #ffe08a);
+        border: 3px solid #d4af37 !important;
+        box-shadow: 0 6px 20px rgba(212,175,55,0.45);
+    }}
+
+    .rank-top-3 {{
+        border-width: 3px !important;
+    }}
+
+    .rank-ind-RI {{ border-color: #ff6b6b !important; }}
+    .rank-ind-FOD {{ border-color: #ff9f43 !important; }}
+    .rank-ind-COLISAO {{ border-color: #1dd1a1 !important; }}
+    .rank-ind-FAUNA {{ border-color: #54a0ff !important; }}
+    .rank-ind-OUTROS {{ border-color: #8395a7 !important; }}
+
+    /* ======================================================
+       🔰 TÍTULO PRINCIPAL DO APP (INCLUSÃO)
+       ====================================================== */
+    .app-title {{
+        text-align: center;
+        color: #96CE00;
+        font-size: 40px;
+        font-weight: 1000;
+        margin-bottom: 6px;
+    }}
+
+    .app-subtitle {{
+        text-align: center;
+        color: #96CE00;
+        font-size: 60px;
+        font-weight: 400;
+        letter-spacing: 0.6px;
+        margin-top: 0px;
+        margin-bottom: 24px;
+        font-family: "Brighter", "Brighter Regular", Arial, sans-serif;
+    }}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ======================================================
+# MAPAS / CONSTANTES
+# ======================================================
+RENAME = {
+    "AEROPORTO": "aeroporto",
+    "ANO": "ano",
+    "MÊS": "mes",
+    "Nº DE EVENTOS": "eventos",
+    "MOVIMENTAÇÃO (P + D)": "mov",
+    "OrdemMes": "ordem_mes",
+    "OrdemAno": "ordem_ano",
+    "Indicador": "indicador",
+    "Criado": "criado_em",
+    "Criado por": "criado_por",
+}
+
+MESES_MAP = {
+    "JANEIRO": 1, "FEVEREIRO": 2, "MARÇO": 3, "MARCO": 3, "ABRIL": 4, "MAIO": 5, "JUNHO": 6,
+    "JULHO": 7, "AGOSTO": 8, "SETEMBRO": 9, "OUTUBRO": 10, "NOVEMBRO": 11, "DEZEMBRO": 12
+}
+MESES_ABREV = {1:"Jan",2:"Fev",3:"Mar",4:"Abr",5:"Mai",6:"Jun",7:"Jul",8:"Ago",9:"Set",10:"Out",11:"Nov",12:"Dez"}
+ORDEM_MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+
+# ======================================================
+# FUNÇÕES UTILITÁRIAS
+# ======================================================
+def fmt_int(x):
+    try:
+        return f"{int(x):,}".replace(",", ".")
+    except Exception:
+        return "0"
+
+def fmt_pct(x, digits=0):
+    try:
+        return f"{x*100:+.{digits}f}%"
+    except Exception:
+        return "—"
+
+def card_html(titulo, valor, cor_valor="#333", subtitulo=None, icon=None):
+    ic = f"{icon} " if icon else ""
+    sub = f'<div class="kpi-sub">{subtitulo}</div>' if subtitulo else ""
+    return f"""
+    <div class="kpi-card">
+        <div class="kpi-title">{ic}{titulo}</div>
+        <div class="kpi-value" style="color:{cor_valor};">{valor}</div>
+        {sub}
+    </div>
+    """
+
+def df_to_excel_bytes(sheets: dict) -> bytes:
+    out = BytesIO()
+    with pd.ExcelWriter(out, engine="openpyxl") as writer:
+        for name, df_ in sheets.items():
+            df_.to_excel(writer, index=False, sheet_name=str(name)[:31])
+    return out.getvalue()
+
+def make_zip(files):
+    bio = BytesIO()
+    with ZipFile(bio, "w", compression=ZIP_DEFLATED) as zf:
+        for name, content in files:
+            zf.writestr(name, content)
+    return bio.getvalue()
+
+@st.cache_data(show_spinner=False)
+def read_excel_and_hash(file_bytes: bytes):
+    sha = hashlib.sha256(file_bytes).hexdigest()
+    df = pd.read_excel(BytesIO(file_bytes), sheet_name="query")
+    return df, sha
+
+def prepare_idso(df_raw: pd.DataFrame) -> pd.DataFrame:
+    df = df_raw.rename(columns=RENAME).copy()
+
+    for c in ["aeroporto", "indicador", "mes", "ano", "eventos", "mov"]:
+        if c not in df.columns:
+            df[c] = pd.NA
+
+    df["aeroporto"] = df["aeroporto"].astype(str).str.strip().str.upper()
+    df["indicador"] = df["indicador"].astype(str).str.strip()
+    df["mes"] = df["mes"].astype(str).str.strip()
+
+    df["ano"] = pd.to_numeric(df["ano"], errors="coerce").astype("Int64")
+    df["eventos"] = pd.to_numeric(df["eventos"], errors="coerce").fillna(0).astype(int)
+    df["mov"] = pd.to_numeric(df["mov"], errors="coerce").fillna(0).astype(int)
+
+    df["ordem_mes"] = pd.to_numeric(df.get("ordem_mes", pd.NA), errors="coerce").astype("Int64")
+    mes_upper = df["mes"].astype(str).str.upper().str.strip()
+    mes_from_name = mes_upper.map(MESES_MAP).astype("Int64")
+    invalid = (df["ordem_mes"].isna()) | (~df["ordem_mes"].between(1, 12))
+    df.loc[invalid, "ordem_mes"] = mes_from_name[invalid]
+
+    df = df[df["ordem_mes"].between(1, 12, inclusive="both")].copy()
+    df["mes_abrev"] = df["ordem_mes"].map(MESES_ABREV)
+
+    if "criado_em" in df.columns:
+        df["criado_em"] = pd.to_datetime(df["criado_em"], errors="coerce")
+
+    df["chave"] = (
+        df["aeroporto"].astype(str) + "|" +
+        df["ano"].astype(str) + "|" +
+        df["ordem_mes"].astype(str) + "|" +
+        df["indicador"].astype(str)
+    )
+    return df
+
+def apply_filters(df: pd.DataFrame, sel_aero, sel_ano, sel_ind, sel_mes_abrev):
+    d = df.copy()
+    if sel_aero: d = d[d["aeroporto"].isin(sel_aero)]
+    if sel_ano: d = d[d["ano"].isin(sel_ano)]
+    if sel_ind: d = d[d["indicador"].isin(sel_ind)]
+    if sel_mes_abrev: d = d[d["mes_abrev"].isin(sel_mes_abrev)]
+    return d
+
+def prev_month(today: date):
+    if today.month == 1:
+        return today.year - 1, 12
+    return today.year, today.month - 1
+
+def due_date_for_period(today: date):
+    return date(today.year, today.month, 10)
+
+def period_to_int(y: int, m: int) -> int:
+    return y * 100 + m
+
+def int_to_period(p: int):
+    return p // 100, p % 100
+
+def add_months(y: int, m: int, delta: int):
+    for _ in range(delta):
+        m += 1
+        if m == 13:
+            m = 1
+            y += 1
+    return y, m
+
+def calc_pending_by_airport(df_all: pd.DataFrame, today: date):
+    req_y, req_m = prev_month(today)
+    required = period_to_int(req_y, req_m)
+    due = due_date_for_period(today)
+
+    rows = []
+    base = df_all.dropna(subset=["ano", "ordem_mes"]).copy()
+    if base.empty:
+        return pd.DataFrame(columns=[
+            "aeroporto","required_period","required_ano","required_mes","required_mes_abrev",
+            "due_date","days_from_due","is_overdue","is_ok","missing_months","last_period"
+        ]), required, due
+
+    for aero, g in base.groupby("aeroporto"):
+        g = g.copy()
+        g["period"] = g["ano"].astype(int) * 100 + g["ordem_mes"].astype(int)
+        last_period = int(g["period"].max())
+        ok = last_period >= required
+
+        missing_months = 0
+        if not ok:
+            ly, lm = int_to_period(last_period)
+            diff = 0
+            cy, cm = ly, lm
+            while period_to_int(cy, cm) < required and diff < 60:
+                cy, cm = add_months(cy, cm, 1)
+                diff += 1
+            missing_months = diff
+
+        days = (today - due).days
+        rows.append({
+            "aeroporto": aero,
+            "required_period": required,
+            "required_ano": req_y,
+            "required_mes": req_m,
+            "required_mes_abrev": MESES_ABREV.get(req_m, str(req_m)),
+            "due_date": due.isoformat(),
+            "days_from_due": int(days),
+            "is_overdue": bool(today > due),
+            "is_ok": bool(ok),
+            "missing_months": int(missing_months),
+            "last_period": int(last_period),
+        })
+    return pd.DataFrame(rows), required, due
+
+def stat_banner_mov_years(df_f: pd.DataFrame):
+    if df_f.empty:
+        return ""
+
+    # 🔹 remove duplicidade de movimentação por indicador
+    base = (
+        df_f
+        .drop_duplicates(subset=["aeroporto", "ano", "ordem_mes"])
+        .copy()
+    )
+
+    byy = (
+        base
+        .groupby("ano", as_index=False)["mov"]
+        .sum()
+        .sort_values("ano", ascending=False)
+    )
+
+    byy["prev"] = byy["mov"].shift(-1)
+
+    parts = []
+    for _, r in byy.iterrows():
+        ano = int(r["ano"])
+        mov = int(r["mov"])
+
+        if pd.notna(r["prev"]) and int(r["prev"]) != 0:
+            pct = (mov / int(r["prev"])) - 1
+            if pct > 0:
+                arrow = f'<span class="up">(+{abs(pct)*100:.0f}% ↑)</span>'
+            elif pct < 0:
+                arrow = f'<span class="down">(-{abs(pct)*100:.0f}% ↓)</span>'
+            else:
+                arrow = f'<span class="flat">(0% •)</span>'
+        else:
+            arrow = ""
+
+        parts.append(f"{ano}: {fmt_int(mov)} {arrow}")
+
+    line = " | ".join(parts)
+
+    return f"""
+    <div class="stat-banner">
+        <div class="stat-title">COMPARATIVO ESTATÍSTICO – MOVIMENTAÇÕES</div>
+        <div class="stat-line">{line}</div>
+    </div>
+    """
+
+def stat_banner_years(df_f: pd.DataFrame):
+    if df_f.empty:
+        return ""
+    byy = df_f.groupby("ano", as_index=False)["eventos"].sum().sort_values("ano", ascending=False)
+    byy["prev"] = byy["eventos"].shift(-1)
+    parts = []
+    for _, r in byy.iterrows():
+        ano = int(r["ano"]); ev = int(r["eventos"])
+        if pd.notna(r["prev"]) and int(r["prev"]) != 0:
+            pct = (ev / int(r["prev"])) - 1
+            if pct > 0:
+                arrow = f'<span class="up">(+{abs(pct)*100:.0f}% ↑)</span>'
+            elif pct < 0:
+                arrow = f'<span class="down">(-{abs(pct)*100:.0f}% ↓)</span>'
+            else:
+                arrow = f'<span class="flat">(0% •)</span>'
+        else:
+            arrow = ""
+        parts.append(f"{ano}: {fmt_int(ev)} {arrow}")
+    line = " | ".join(parts)
+    return f"""
+    <div class="stat-banner">
+        <div class="stat-title">COMPARATIVO ESTATÍSTICO – EVENTOS IDSO</div>
+        <div class="stat-line">{line}</div>
+    </div>
+    """
+
+# ======================================================
+# TÍTULO + UPLOAD
+# ======================================================
+title_placeholder = st.empty()
+title_placeholder.markdown(
+    f"""
+    <h1 class='app-title'>{APP_TITLE}</h1>
+    <div class='app-subtitle'>Safety Corporativa</div>
+    <div class='app-sub'>Carregue um arquivo XLSX para iniciar</div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown("<div class='upload-wrap'>", unsafe_allow_html=True)
+uploaded = st.file_uploader("📤 Enviar arquivo IDSO (.xlsx)", type=["xlsx"])
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+def load_data():
+    if uploaded is not None:
+        b = uploaded.getvalue() if hasattr(uploaded, "getvalue") else uploaded.read()
+
+        # 🔹 lê o arquivo + hash (SUA FUNÇÃO, SEM ALTERAÇÃO)
+        raw, sha = read_excel_and_hash(b)
+
+        # ======================================================
+        # 🔥 CONTROLE DE TROCA DE ARQUIVO (É AQUI)
+        # ======================================================
+        if "file_sha" not in st.session_state:
+            st.session_state.file_sha = sha
+
+        # se trocou o arquivo → resetar filtros
+        if st.session_state.file_sha != sha:
+            st.session_state.file_sha = sha
+
+            st.session_state.ano_sel  = ["Todos"]
+            st.session_state.mes_sel  = ["Todos"]
+            st.session_state.aero_sel = ["Todos"]
+            st.session_state.ind_sel  = ["Todos"]
+
+            st.rerun()
+
+        return raw, sha, uploaded.name
+
+    st.warning("⬆️ Envie o arquivo IDSO (.xlsx) para iniciar.")
+    st.stop()
+
+raw_df, sha, source_name = load_data()
+df = prepare_idso(raw_df)
+
+today = date.today()
+pend_df, required_period, due = calc_pending_by_airport(df, today)
+
+title_placeholder.markdown(
+    f"""
+    <h1 class='app-title'>{APP_TITLE}</h1>
+    <div class='app-subtitle'>Safety Corporativa</div>
+    <div class='app-sub'>
+        Fonte: <b>{source_name}</b> • Hash:
+        <code style='color:{ACCENT}; font-weight:1000;'>{sha[:12]}</code>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# ======================================================
+# FILTROS DE ANÁLISE – CONTROLE TOTAL (POWER BI STYLE)
+# ======================================================
+
+# ---------- opções base ----------
+aero_base = sorted(df["aeroporto"].dropna().unique().tolist())
+
+ano_base = sorted(
+    [int(x) for x in df["ano"].dropna().unique().tolist()],
+    reverse=True
+)
+
+ind_base = sorted(df["indicador"].dropna().unique().tolist())
+
+mes_exist = (
+    df[["ordem_mes", "mes_abrev"]]
+    .dropna()
+    .drop_duplicates()
+    .sort_values("ordem_mes")
+)
+
+mes_base = [m for m in ORDEM_MESES_ABREV if m in mes_exist["mes_abrev"].tolist()]
+
+# ---------- opções com "Todos" ----------
+aero_opts = ["Todos"] + aero_base
+ano_opts  = ["Todos"] + ano_base
+mes_opts  = ["Todos"] + mes_base
+ind_opts  = ["Todos"] + ind_base
+
+# ---------- init session_state ----------
+for k, v in {
+    "ano_sel": ["Todos"],
+    "mes_sel": ["Todos"],
+    "aero_sel": ["Todos"],
+    "ind_sel": ["Todos"],
+}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# ======================================================
+# FUNÇÕES DE NORMALIZAÇÃO (ANTI-VAZIO + ORDENAÇÃO)
+# ======================================================
+
+def normalize_ano():
+    v = st.session_state.ano_sel
+
+    # clicou no X → volta para Todos
+    if not v:
+        st.session_state.ano_sel = ["Todos"]
+        return
+
+    # se selecionou outro junto com Todos → remove Todos
+    if "Todos" in v and len(v) > 1:
+        v = [x for x in v if x != "Todos"]
+
+    # se sobrou só Todos
+    if v == ["Todos"]:
+        st.session_state.ano_sel = ["Todos"]
+    else:
+        st.session_state.ano_sel = sorted(v, reverse=True)
+
+
+def normalize_mes():
+    v = st.session_state.mes_sel
+
+    if not v:
+        st.session_state.mes_sel = ["Todos"]
+        return
+
+    if "Todos" in v and len(v) > 1:
+        v = [x for x in v if x != "Todos"]
+
+    if v == ["Todos"]:
+        st.session_state.mes_sel = ["Todos"]
+    else:
+        st.session_state.mes_sel = [m for m in ORDEM_MESES_ABREV if m in v]
+
+
+def normalize_aero():
+    v = st.session_state.aero_sel
+
+    if not v:
+        st.session_state.aero_sel = ["Todos"]
+        return
+
+    if "Todos" in v and len(v) > 1:
+        v = [x for x in v if x != "Todos"]
+
+    if v == ["Todos"]:
+        st.session_state.aero_sel = ["Todos"]
+    else:
+        st.session_state.aero_sel = sorted(v)
+
+
+def normalize_ind():
+    v = st.session_state.ind_sel
+
+    if not v:
+        st.session_state.ind_sel = ["Todos"]
+        return
+
+    if "Todos" in v and len(v) > 1:
+        v = [x for x in v if x != "Todos"]
+
+    if v == ["Todos"]:
+        st.session_state.ind_sel = ["Todos"]
+    else:
+        st.session_state.ind_sel = sorted(v)
+
+# ======================================================
+# UI
+# ======================================================
+
+st.markdown("## 🎛️ Filtros de Análise")
+
+st.multiselect(
+    "📅 Ano",
+    options=ano_opts,
+    default=st.session_state.ano_sel,
+    key="ano_sel",
+    on_change=normalize_ano
+)
+
+st.multiselect(
+    "🗓️ Mês",
+    options=mes_opts,
+    default=st.session_state.mes_sel,
+    key="mes_sel",
+    on_change=normalize_mes
+)
+
+
+st.multiselect(
+    "🛫 Aeroporto",
+    options=aero_opts,
+    default=st.session_state.aero_sel,
+    key="aero_sel",
+    on_change=normalize_aero
+)
+
+st.multiselect(
+    "📌 Indicador",
+    options=ind_opts,
+    default=st.session_state.ind_sel,
+    key="ind_sel",
+    on_change=normalize_ind
+)
+
+st.markdown("---")
+
+# ======================================================
+# APLICA FILTROS (REMOVE "TODOS")
+# ======================================================
+
+sel_ano  = ano_base  if st.session_state.ano_sel  == ["Todos"] else st.session_state.ano_sel
+sel_mes  = mes_base  if st.session_state.mes_sel  == ["Todos"] else st.session_state.mes_sel
+sel_aero = aero_base if st.session_state.aero_sel == ["Todos"] else st.session_state.aero_sel
+sel_ind  = ind_base  if st.session_state.ind_sel  == ["Todos"] else st.session_state.ind_sel
+
+df_f = apply_filters(
+    df,
+    sel_aero,
+    sel_ano,
+    sel_ind,
+    sel_mes
+)
+
+# ======================================================
+# KPIs + BASE MENSAL
+# ======================================================
+total_rows = len(df_f)
+total_eventos = int(df_f["eventos"].sum()) if total_rows else 0
+
+mov_month = df_f.groupby(["aeroporto","ano","ordem_mes"], as_index=False)["mov"].max() if total_rows else pd.DataFrame(columns=["mov"])
+total_mov = int(mov_month["mov"].sum()) if len(mov_month) else 0
+
+indicadores_ativos = int(df_f["indicador"].nunique()) if total_rows else 0
+aero_ativos = int(df_f["aeroporto"].nunique()) if total_rows else 0
+
+monthly = (
+    df_f.groupby(["aeroporto","ano","ordem_mes","mes_abrev"], as_index=False)
+    .agg(eventos=("eventos","sum"), mov=("mov","max"))
+    .sort_values(["aeroporto","ordem_mes","ano"])
+) if total_rows else pd.DataFrame(columns=["aeroporto","ano","ordem_mes","mes_abrev","eventos","mov"])
+
+c1, c2, c3, c4 = st.columns(4)
+with c1: st.markdown(card_html("Aeroportos", fmt_int(aero_ativos), icon="🛫"), unsafe_allow_html=True)
+with c2: st.markdown(card_html("Indicadores", fmt_int(indicadores_ativos), icon="📌"), unsafe_allow_html=True)
+with c3: st.markdown(card_html("Eventos", fmt_int(total_eventos), icon="🚩"), unsafe_allow_html=True)
+with c4:
+    st.markdown(card_html("Movimentações", fmt_int(total_mov), icon="🧮", cor_valor=ACCENT, subtitulo="(soma mensal por aeroporto)"), unsafe_allow_html=True)
+
+st.markdown(stat_banner_mov_years(df_f), unsafe_allow_html=True)
+st.markdown(stat_banner_years(df_f), unsafe_allow_html=True)
+
+# ======================================================
+# TABS
+# ======================================================
+tab1, tab2, tab4, tab3 = st.tabs(["⏱️ Pendências IDSO", "📊 Análises & Gráficos", "📋 Ocorrências & Comparativos", "📦 Exportações"])
+
+with tab1:
+    st.markdown("### ⏱️ Pendências de lançamento do IDSO (prazo: dia 10)")
+    st.caption("Período exigido = mês anterior ao mês atual. Prazo = dia 10 do mês atual.")
+
+    pend_view = pend_df[pend_df["aeroporto"].isin(sel_aero)].copy() if not pend_df.empty else pend_df.copy()
+    pend_only = pend_view[pend_view["is_ok"] == False].sort_values(["missing_months","aeroporto"], ascending=[False, True]) if not pend_view.empty else pend_view
+
+    a, b, c = st.columns(3)
+    req_month = int(str(required_period)[-2:])
+    req_year = int(str(required_period)[:4])
+
+    with a:
+        st.markdown(
+            card_html(
+                "Aeroportos pendentes",
+                fmt_int(len(pend_only)),
+                cor_valor=("#ff5a5f" if len(pend_only) else ACCENT),
+                icon="🔴",
+                subtitulo=f"Período exigido: {MESES_ABREV.get(req_month,str(req_month))}/{req_year}"
+            ),
+            unsafe_allow_html=True
+        )
+    with b: st.markdown(card_html("Data de hoje", today.strftime("%d/%m/%Y"), icon="📅"), unsafe_allow_html=True)
+    with c: st.markdown(card_html("Prazo", due.strftime("%d/%m/%Y"), icon="⏳"), unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    if pend_only.empty:
+        st.success("✅ Nenhum aeroporto pendente no momento (com os filtros atuais).")
+    else:
+        cols = st.columns(3)
+        i = 0
+        for _, r in pend_only.iterrows():
+            aero = r["aeroporto"]
+            req_txt = f"{r['required_mes_abrev']}/{r['required_ano']}"
+            missing = int(r["missing_months"]) if int(r["missing_months"]) else 1
+
+            if r["is_overdue"]:
+                atraso = int(r["days_from_due"])
+                days_txt = f"⏱️ Atraso: <b>{atraso} dia(s)</b>"
+                badge = '<span class="badge red">PENDENTE</span>'
+            else:
+                faltam = abs(int(r["days_from_due"]))
+                days_txt = f"⏱️ Vence em: <b>{faltam} dia(s)</b>"
+                badge = '<span class="badge red">PRAZO ABERTO</span>'
+
+            more = f"• Meses em atraso: <b>{missing}</b>" if missing > 1 else "• Aguardando registro do período exigido"
+            html = f"""
+            <div class="pending-card">
+              <div class="pending-title">{aero} {badge}</div>
+              <div class="pending-sub">Período exigido: <b>{req_txt}</b></div>
+              <div class="pending-days">{days_txt}<br/>{more}</div>
+            </div>
+            """
+            with cols[i % 3]:
+                st.markdown(html, unsafe_allow_html=True)
+            i += 1
+
+with tab2:
+    st.markdown("### 📊 Análises & Gráficos")
+    st.caption("Use os filtros para mudar o recorte. Sem tabelas na tela.")
+
+    if df_f.empty:
+        st.info("Sem dados com os filtros atuais.")
+    else:
+        m = monthly.copy()
+        m["mes_abrev"] = pd.Categorical(
+            m["mes_abrev"],
+            categories=ORDEM_MESES_ABREV,
+            ordered=True
+        )
+        m = m.sort_values(["aeroporto", "ano", "mes_abrev"])
+
+        # ------------------------------------------------------
+        # 1) Séries de Eventos por Mês (por ano) — LINHA
+        # ------------------------------------------------------
+        st.markdown("#### 1) Eventos por mês (por ano)")
+
+        ser = (
+            df_f
+            .groupby(["ano", "ordem_mes", "mes_abrev"], as_index=False)["eventos"]
+            .sum()
+            .sort_values(["ano", "ordem_mes"])
+        )
+        ser["mes_abrev"] = pd.Categorical(
+            ser["mes_abrev"],
+            categories=ORDEM_MESES_ABREV,
+            ordered=True
+        )
+
+        # ----- cores dinâmicas por ANO -----
+        anos_disp = sorted(ser["ano"].unique().tolist())
+
+        if "color_map_anos" not in st.session_state:
+            base_colors = [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#17becf"
+            ]
+            st.session_state.color_map_anos = {
+                ano: base_colors[i % len(base_colors)]
+                for i, ano in enumerate(anos_disp)
+            }
+
+        with st.expander("🎨 Ajustar cores das linhas (anos)", expanded=False):
+            cols = st.columns(3)
+            for i, ano in enumerate(anos_disp):
+                with cols[i % 3]:
+                    st.session_state.color_map_anos[ano] = st.color_picker(
+                        label=f"Ano {ano}",
+                        value=st.session_state.color_map_anos[ano],
+                        key=f"color_ano_{ano}"
+                    )
+
+        titulo_ind = (
+        "Todos os Indicadores"
+        if st.session_state.ind_sel == ["Todos"]
+        else ", ".join(st.session_state.ind_sel)
+        )
+
+        fig1 = px.line(
+            ser,
+            x="mes_abrev",
+            y="eventos",
+            color="ano",
+            markers=True,
+            text=ser["eventos"].map(fmt_int),
+            color_discrete_map=st.session_state.color_map_anos
+        )
+
+        fig1.update_traces(
+            textposition="top center",
+            marker=dict(size=10),
+            line=dict(width=3),
+            textfont=dict(
+                color="#1A1A1A",
+                size=14,
+                family="Arial Black"
+            )
+        )
+
+        fig1.update_layout(
+            title=titulo_ind,
+            xaxis_title=None,
+            yaxis_title=None,
+            legend_title_text=None,
+            xaxis=dict(showgrid=False, zeroline=False),
+            yaxis=dict(showgrid=False, zeroline=False),
+            margin=dict(l=10, r=10, t=55, b=10),
+        )
+
+        st.plotly_chart(fig1, use_container_width=True)
+
+        # ------------------------------------------------------
+        # 2) Participação por indicador
+        # ------------------------------------------------------
+        st.markdown("#### 2) Participação por indicador")
+
+        ind_sum = (
+            df_f
+            .groupby("indicador", as_index=False)["eventos"]
+            .sum()
+            .sort_values("eventos", ascending=False)
+            .head(12)
+        )
+
+        # quebra de texto para rótulos longos
+        def quebra_texto(s, max_len=18):
+            palavras = s.split()
+            linhas = []
+            atual = ""
+            for p in palavras:
+                if len(atual) + len(p) <= max_len:
+                    atual = (atual + " " + p).strip()
+                else:
+                    linhas.append(atual)
+                    atual = p
+            if atual:
+                linhas.append(atual)
+            return "<br>".join(linhas)
+
+        ind_sum["indicador_fmt"] = ind_sum["indicador"].apply(quebra_texto)
+
+        # -----------------------------
+        # controle de largura dinâmica
+        # -----------------------------
+        n_barras = len(ind_sum)
+        bar_width = 0.6 if n_barras > 1 else 0.35  # ← ocupa mais espaço quando só 1
+
+        # -----------------------------
+        # lógica de rótulo interno/externo
+        # -----------------------------
+        max_val = ind_sum["eventos"].max()
+
+        def label_position(v):
+            return "inside" if v >= max_val * 0.25 else "outside"
+
+        def label_color(v):
+            return "white" if v >= max_val * 0.25 else "#333"
+
+        ind_sum["label_pos"] = ind_sum["eventos"].apply(label_position)
+        ind_sum["label_color"] = ind_sum["eventos"].apply(label_color)
+
+        fig2 = px.bar(
+            ind_sum,
+            x="indicador_fmt",
+            y="eventos",
+            text=ind_sum["eventos"].map(fmt_int),
+        )
+
+        fig2.update_traces(
+            marker_color=ACCENT,
+            width=bar_width,
+            textfont=dict(
+                size=14,
+                family="Arial Black"
+            )
+        )
+
+        # aplica posição e cor manualmente (100% confiável)
+        for i, row in ind_sum.iterrows():
+            fig2.data[0].textposition = ind_sum["label_pos"].tolist()
+            fig2.data[0].textfont.color = ind_sum["label_color"].tolist()
+
+        fig2.update_layout(
+            xaxis_title=None,
+            yaxis_title=None,
+            showlegend=False,
+            xaxis=dict(
+                showgrid=False,
+                zeroline=False,
+                tickangle=0,
+                tickfont=dict(size=12)
+            ),
+            yaxis=dict(
+                showgrid=False,
+                zeroline=False
+            ),
+            margin=dict(l=10, r=10, t=20, b=40)
+        )
+
+        st.plotly_chart(fig2, use_container_width=True)
+
+        # ------------------------------------------------------
+        # 3) Total de eventos por ano (barras verdes + rótulo branco)
+        # ------------------------------------------------------
+        st.markdown("#### 3) Total de eventos por ano")
+
+        byy = (
+            df_f
+            .groupby("ano", as_index=False)["eventos"]
+            .sum()
+            .sort_values("ano", ascending=False)  # ← ORDEM 2025 → 2020
+        )
+
+        byy["ano"] = byy["ano"].astype(int)
+
+        fig3 = px.bar(
+            byy,
+            x="ano",
+            y="eventos",
+            text=byy["eventos"].map(fmt_int)
+        )
+
+        fig3.update_traces(
+            marker_color=ACCENT,
+            textposition="inside",
+            textfont=dict(color="white", size=18, family="Arial Black"),
+        )
+
+        fig3.update_layout(
+            xaxis_title=None,
+            yaxis_title=None,
+            showlegend=False,
+            xaxis=dict(
+                type="category",
+                categoryorder="array",                # ← força ordem manual
+                categoryarray=byy["ano"].tolist(),    # ← exatamente como o dataframe
+                showgrid=False,
+                zeroline=False,
+            ),
+            yaxis=dict(showgrid=False, zeroline=False),
+            margin=dict(l=10, r=10, t=15, b=10),
+        )
+
+        st.plotly_chart(fig3, use_container_width=True)
+
+        # ======================================================
+        # FUNÇÃO AUXILIAR – CLASSE CSS POR INDICADOR
+        # ======================================================
+        def classe_indicador(nome):
+            nome = nome.upper()
+            if "RI" in nome:
+                return "rank-ind-RI"
+            if "FOD" in nome:
+                return "rank-ind-FOD"
+            if "COL" in nome:
+                return "rank-ind-COLISAO"
+            if "FAUNA" in nome:
+                return "rank-ind-FAUNA"
+            return "rank-ind-OUTROS"
+
+        # ------------------------------------------------------
+        # 4) Top eventos por indicador (ranking por aeroporto)
+        # ------------------------------------------------------
+        st.markdown("#### 4) Top eventos por indicador (ranking por aeroporto)")
+
+        rank_df = (
+            df_f
+            .groupby(["indicador", "aeroporto"], as_index=False)["eventos"]
+            .sum()
+        )
+
+        if rank_df.empty:
+            st.info("Nenhum dado disponível para o ranking.")
+        else:
+            indicadores_ordem = (
+                rank_df
+                .groupby("indicador")["eventos"]
+                .sum()
+                .sort_values(ascending=False)
+                .index
+                .tolist()
+            )
+
+            for indicador in indicadores_ordem:
+                sub = (
+                    rank_df[rank_df["indicador"] == indicador]
+                    .sort_values("eventos", ascending=False)
+                    .head(17)
+                    .reset_index(drop=True)
+                )
+
+                classe_ind = classe_indicador(indicador)
+
+                # 🔽 AQUI É O RECOLHER / ABRIR
+                with st.expander(f"📌 {indicador}", expanded=False):
+
+                    html_cards = '<div class="rank-grid">'
+
+                    for pos, row in sub.iterrows():
+
+                        classes = ["rank-card-mini", classe_ind]
+
+                        # 🥇 Top 1
+                        if pos == 0:
+                            classes.append("rank-top-1")
+
+                        # 🥈🥉 Top 2 e 3
+                        elif pos in [1, 2]:
+                            classes.append("rank-top-3")
+
+                        html_cards += (
+                            f'<div class="{" ".join(classes)}">'
+                            f'<div class="rank-pos">#{pos + 1}</div>'
+                            f'<div class="rank-aero">{row["aeroporto"]}</div>'
+                            f'<div class="rank-value">{fmt_int(row["eventos"])}</div>'
+                            '<div class="rank-label">eventos</div>'
+                            '</div>'
+                        )
+
+                    html_cards += "</div>"
+
+                    st.markdown(html_cards, unsafe_allow_html=True)
+
+with tab4:
+    st.markdown("### 📋 Ocorrências & Comparativos")
+    st.caption("Painel consolidado e comparativo entre aeroportos. Use os filtros globais para definir o recorte (Ano/Mês/Indicador).")
+
+    if df_f.empty:
+        st.info("Sem dados com os filtros atuais.")
+    else:
+        # ------------------------------------------------------
+        # 5) Comparativo de Aeroportos (colunas)
+        # ------------------------------------------------------
+        st.markdown("#### 5) Comparativo de Aeroportos")
+
+        comp_aero_opts = sorted(df["aeroporto"].dropna().unique().tolist())
+        if len(comp_aero_opts) >= 2:
+            ca1, ca2 = st.columns(2)
+            with ca1:
+                aero_a = st.selectbox(
+                    "Aeroporto A",
+                    options=comp_aero_opts,
+                    index=0,
+                    key="cmp_aero_a_tab4"
+                )
+            with ca2:
+                idx_b = 1 if comp_aero_opts[0] != comp_aero_opts[1] else 0
+                aero_b = st.selectbox(
+                    "Aeroporto B",
+                    options=comp_aero_opts,
+                    index=idx_b,
+                    key="cmp_aero_b_tab4"
+                )
+
+            base_cmp = df.copy()
+            if sel_ano:
+                base_cmp = base_cmp[base_cmp["ano"].isin(sel_ano)]
+            if sel_mes:
+                base_cmp = base_cmp[base_cmp["mes_abrev"].isin(sel_mes)]
+            if sel_ind:
+                base_cmp = base_cmp[base_cmp["indicador"].isin(sel_ind)]
+
+            cmp = (
+                base_cmp[base_cmp["aeroporto"].isin([aero_a, aero_b])]
+                .groupby(["aeroporto", "ordem_mes", "mes_abrev"], as_index=False)["eventos"]
+                .sum()
+            )
+
+            cmp["mes_abrev"] = pd.Categorical(
+                cmp["mes_abrev"],
+                categories=ORDEM_MESES_ABREV,
+                ordered=True
+            )
+            cmp = cmp.sort_values(["ordem_mes", "aeroporto"])
+
+            color_map = {aero_a: ACCENT, aero_b: "#2BB7FF"}
+
+            fig_cmp = px.bar(
+                cmp,
+                x="mes_abrev",
+                y="eventos",
+                color="aeroporto",
+                text=cmp["eventos"].map(fmt_int),
+                color_discrete_map=color_map,
+            )
+
+            # ======================================================
+            # LÓGICA DE RÓTULO (IGUAL AO GRÁFICO 2)
+            # ======================================================
+            for trace in fig_cmp.data:
+                valores = list(trace.y)
+                max_val = max(valores) if valores else 0
+
+                text_pos = []
+                text_color = []
+
+                for v in valores:
+                    if v >= max_val * 0.25:
+                        text_pos.append("inside")
+                        text_color.append("white")
+                    else:
+                        text_pos.append("outside")
+                        text_color.append("#333")
+
+                trace.textposition = text_pos
+                trace.textfont = dict(
+                    color=text_color,
+                    size=14,
+                    family="Arial Black"
+                )
+
+            fig_cmp.update_layout(
+                barmode="group",
+                xaxis_title=None,
+                yaxis_title=None,
+                legend_title_text=None,
+                xaxis=dict(showgrid=False, zeroline=False),
+                yaxis=dict(showgrid=False, zeroline=False),
+                margin=dict(l=10, r=10, t=15, b=10),
+            )
+
+            st.plotly_chart(fig_cmp, use_container_width=True)
+
+            # ------------------------------------------------------
+            # KPIs – Comparativo A x B (TOTAL + VARIAÇÃO %)
+            # ------------------------------------------------------
+            total_a = cmp.loc[cmp["aeroporto"] == aero_a, "eventos"].sum()
+            total_b = cmp.loc[cmp["aeroporto"] == aero_b, "eventos"].sum()
+
+            if total_b > 0:
+                pct_var = (total_a - total_b) / total_b
+            else:
+                pct_var = 0
+
+            def fmt_pct_cmp(v):
+                return f"{v*100:+.2f}%".replace(".", ",")
+
+            cor_a = color_map.get(aero_a, "#1a2732")
+            cor_b = color_map.get(aero_b, "#1a2732")
+
+            k1, k2, k3 = st.columns(3)
+
+            # 🔹 Cartão Aeroporto A
+            with k1:
+                st.markdown(
+                    f"""
+                    <div class="kpi-card">
+                        <div class="kpi-title" style="color:{cor_a};">{aero_a}</div>
+                        <div class="kpi-value" style="color:{cor_a};">{fmt_int(total_a)}</div>
+                        <div class="kpi-sub">eventos</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            # 🔸 Cartão Variação %
+            with k2:
+                cor_var = "up" if pct_var > 0 else "down" if pct_var < 0 else "flat"
+                st.markdown(
+                    f"""
+                    <div class="kpi-card">
+                        <div class="kpi-title">Variação A × B</div>
+                        <div class="kpi-value {cor_var}">{fmt_pct_cmp(pct_var)}</div>
+                        <div class="kpi-sub">{aero_a} vs {aero_b}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            # 🔹 Cartão Aeroporto B
+            with k3:
+                st.markdown(
+                    f"""
+                    <div class="kpi-card">
+                        <div class="kpi-title" style="color:{cor_b};">{aero_b}</div>
+                        <div class="kpi-value" style="color:{cor_b};">{fmt_int(total_b)}</div>
+                        <div class="kpi-sub">eventos</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        else:
+            st.info("Base insuficiente para comparar aeroportos.")
+
+with tab3:
+    st.markdown("### 📦 Exportações")
+    st.caption("Relatório XLSX + pacote ZIP (inclui pendências e metadados).")
+
+    sheets = {
+        "RAW_FILTRADO": df_f.drop(columns=["chave"], errors="ignore"),
+        "EVENTOS_MENSAL_AEROPORTO": monthly,
+        "TOTAL_EVENTOS_ANO": df_f.groupby("ano", as_index=False)["eventos"].sum().sort_values("ano"),
+        "TOTAL_EVENTOS_INDICADOR": df_f.groupby("indicador", as_index=False)["eventos"].sum().sort_values("eventos", ascending=False),
+    }
+    xlsx_bytes = df_to_excel_bytes(sheets)
+
+    st.download_button(
+        "⬇️ Baixar relatório XLSX (filtros aplicados)",
+        data=xlsx_bytes,
+        file_name="IDSO_Relatorio.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    meta = {
+        "generated_at_utc": datetime.utcnow().isoformat() + "Z",
+        "today_local": today.isoformat(),
+        "source_name": source_name,
+        "hash_sha256": sha,
+        "filters": {"aeroporto": sel_aero, "ano": sel_ano, "indicador": sel_ind, "mes": sel_mes},
+        "rule": {"due_day": 10, "required_period": int(required_period), "due_date": due.isoformat()},
+        "counts": {
+            "rows_filtered": int(len(df_f)),
+            "eventos_filtered": int(total_eventos),
+            "mov_filtered_sum_by_month": int(total_mov),
+        }
+    }
+
+    pend_export = pend_df.copy()
+    if not pend_export.empty:
+        pend_export["required_period_txt"] = pend_export["required_mes_abrev"].astype(str) + "/" + pend_export["required_ano"].astype(str)
+        pend_export = pend_export.sort_values(["is_ok","aeroporto"])
+
+    zip_bytes = make_zip([
+        ("metadata.json", json.dumps(meta, ensure_ascii=False, indent=2).encode("utf-8")),
+        ("IDSO_Relatorio.xlsx", xlsx_bytes),
+        ("Pendencias_IDSO.xlsx", df_to_excel_bytes({"PENDENCIAS": pend_export})),
+    ])
+
+    st.download_button(
+        "📦 Baixar pacote ZIP (XLSX + pendências + metadados)",
+        data=zip_bytes,
+        file_name="IDSO_Pacote.zip",
+        mime="application/zip"
+    )
