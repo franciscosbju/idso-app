@@ -523,31 +523,52 @@ title_placeholder.markdown(
 )
 
 st.markdown("<div class='upload-wrap'>", unsafe_allow_html=True)
-uploaded = st.file_uploader("📤 Enviar arquivo IDSO (.xlsx)", type=["xlsx"])
+
+uploaded = st.file_uploader(
+    "📤 Enviar arquivo IDSO (.xlsx)",
+    type=["xlsx"],
+    key="uploader_idso"   # 🔥 ESSENCIAL
+)
+
 st.markdown("</div>", unsafe_allow_html=True)
 
-
 def load_data():
-    if uploaded is not None:
-        b = uploaded.getvalue() if hasattr(uploaded, "getvalue") else uploaded.read()
-        raw, sha = read_excel_and_hash(b)
 
-        if "file_sha" not in st.session_state:
-            st.session_state.file_sha = sha
+    # 🔥 CASO 1 — ARQUIVO REMOVIDO (clicou no ❌)
+    if uploaded is None:
 
-        if st.session_state.file_sha != sha:
-            st.session_state.file_sha = sha
-            st.session_state.ano_sel  = ["Todos"]
-            st.session_state.mes_sel  = ["Todos"]
-            st.session_state.aero_sel = ["Todos"]
-            st.session_state.ind_sel  = ["Todos"]
-            st.rerun()
+        # limpa tudo
+        for k in ["ano_sel", "mes_sel", "aero_sel", "ind_sel"]:
+            st.session_state[k] = ["Todos"]
 
-        return raw, sha, uploaded.name
+        # remove hash anterior
+        st.session_state.pop("file_sha", None)
 
-    # 🔥 AQUI
-    for k in ["ano_sel", "mes_sel", "aero_sel", "ind_sel"]:
-        st.session_state[k] = ["Todos"]
+        st.warning("⬆️ Envie o arquivo IDSO (.xlsx) para iniciar.")
+        st.stop()
+
+    # 🔥 CASO 2 — ARQUIVO PRESENTE
+    b = uploaded.getvalue() if hasattr(uploaded, "getvalue") else uploaded.read()
+    raw, sha = read_excel_and_hash(b)
+
+    # primeiro carregamento
+    if "file_sha" not in st.session_state:
+        st.session_state.file_sha = sha
+
+        # garante estado inicial limpo
+        for k in ["ano_sel", "mes_sel", "aero_sel", "ind_sel"]:
+            st.session_state[k] = ["Todos"]
+
+    # trocou o arquivo
+    elif st.session_state.file_sha != sha:
+        st.session_state.file_sha = sha
+
+        for k in ["ano_sel", "mes_sel", "aero_sel", "ind_sel"]:
+            st.session_state[k] = ["Todos"]
+
+        st.rerun()
+
+    return raw, sha, uploaded.name
 
     st.warning("⬆️ Envie o arquivo IDSO (.xlsx) para iniciar.")
     st.stop()
@@ -598,6 +619,20 @@ aero_opts = ["Todos"] + aero_base
 ano_opts  = ["Todos"] + ano_base
 mes_opts  = ["Todos"] + mes_base
 ind_opts  = ["Todos"] + ind_base
+
+# 🔥 PASSO 3 — BLINDAGEM
+def sanitize_multiselect(key, options):
+    current = st.session_state.get(key, [])
+    if not current or any(v not in options for v in current):
+        st.session_state[key] = ["Todos"]
+        return
+    if "Todos" in current and len(current) > 1:
+        st.session_state[key] = [v for v in current if v != "Todos"]
+
+sanitize_multiselect("ano_sel", ano_opts)
+sanitize_multiselect("mes_sel", mes_opts)
+sanitize_multiselect("aero_sel", aero_opts)
+sanitize_multiselect("ind_sel", ind_opts)
 
 # ---------- init session_state ----------
 for k, v in {
