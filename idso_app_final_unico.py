@@ -530,28 +530,24 @@ st.markdown("</div>", unsafe_allow_html=True)
 def load_data():
     if uploaded is not None:
         b = uploaded.getvalue() if hasattr(uploaded, "getvalue") else uploaded.read()
-
-        # 🔹 lê o arquivo + hash (SUA FUNÇÃO, SEM ALTERAÇÃO)
         raw, sha = read_excel_and_hash(b)
 
-        # ======================================================
-        # 🔥 CONTROLE DE TROCA DE ARQUIVO (É AQUI)
-        # ======================================================
         if "file_sha" not in st.session_state:
             st.session_state.file_sha = sha
 
-        # se trocou o arquivo → resetar filtros
         if st.session_state.file_sha != sha:
             st.session_state.file_sha = sha
-
             st.session_state.ano_sel  = ["Todos"]
             st.session_state.mes_sel  = ["Todos"]
             st.session_state.aero_sel = ["Todos"]
             st.session_state.ind_sel  = ["Todos"]
-
             st.rerun()
 
         return raw, sha, uploaded.name
+
+    # 🔥 AQUI
+    for k in ["ano_sel", "mes_sel", "aero_sel", "ind_sel"]:
+        st.session_state[k] = ["Todos"]
 
     st.warning("⬆️ Envie o arquivo IDSO (.xlsx) para iniciar.")
     st.stop()
@@ -704,7 +700,6 @@ st.multiselect(
     key="mes_sel",
     on_change=normalize_mes
 )
-
 
 st.multiselect(
     "🛫 Aeroporto",
