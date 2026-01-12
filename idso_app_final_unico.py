@@ -322,7 +322,7 @@ def make_zip(files):
 @st.cache_data(show_spinner=False)
 def read_excel_and_hash(file_bytes: bytes):
     sha = hashlib.sha256(file_bytes).hexdigest()
-    df = pd.read_excel(BytesIO(file_bytes), sheet_name="query")
+    df = pd.read_excel(BytesIO(file_bytes))
     return df, sha
 
 def prepare_idso(df_raw: pd.DataFrame) -> pd.DataFrame:
