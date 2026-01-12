@@ -161,6 +161,14 @@ st.markdown(
         box-shadow: 0 8px 18px rgba(0,0,0,0.08);
     }}
 
+    .pending-title {{
+    text-align: center;
+    font-weight: 1000;
+    font-size: 18px;
+    color: #ff5a5f;
+    margin-bottom: 6px;
+    }}
+
     /* ======================================================
        RANKING – TOP EVENTOS POR INDICADOR (MINI CARDS)
        ====================================================== */
@@ -849,7 +857,8 @@ with tab1:
             more = f"• Meses em atraso: <b>{missing}</b>" if missing > 1 else "• Aguardando registro do período exigido"
             html = f"""
             <div class="pending-card">
-              <div class="pending-title">{aero} {badge}</div>
+              <div class="pending-title">{aero}</div>
+              <div style="text-align:center;">{badge}</div>
               <div class="pending-sub">Período exigido: <b>{req_txt}</b></div>
               <div class="pending-days">{days_txt}<br/>{more}</div>
             </div>
