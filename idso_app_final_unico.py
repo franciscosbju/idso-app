@@ -723,7 +723,6 @@ st.markdown("## 🎛️ Filtros de Análise")
 st.multiselect(
     "📅 Ano",
     options=ano_opts,
-    default=st.session_state.ano_sel,
     key="ano_sel",
     on_change=normalize_ano
 )
@@ -731,7 +730,6 @@ st.multiselect(
 st.multiselect(
     "🗓️ Mês",
     options=mes_opts,
-    default=st.session_state.mes_sel,
     key="mes_sel",
     on_change=normalize_mes
 )
@@ -739,7 +737,6 @@ st.multiselect(
 st.multiselect(
     "🛫 Aeroporto",
     options=aero_opts,
-    default=st.session_state.aero_sel,
     key="aero_sel",
     on_change=normalize_aero
 )
@@ -747,7 +744,6 @@ st.multiselect(
 st.multiselect(
     "📌 Indicador",
     options=ind_opts,
-    default=st.session_state.ind_sel,
     key="ind_sel",
     on_change=normalize_ind
 )
