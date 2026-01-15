@@ -259,6 +259,16 @@ st.markdown(
         font-family: "Brighter", "Brighter Regular", Arial, sans-serif;
     }}
 
+    /* ======================================================
+   🔽 AJUSTE REAL DO TEXTO DOS EXPANDERS (FUNCIONA)
+   ====================================================== */
+    div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p {{
+        font-size: 18px !important;   /* 🔥 AGORA FUNCIONA */
+        font-weight: 1000 !important;
+        color: #1a2732 !important;
+        margin: 0 !important;
+    }}
+
     </style>
     """,
     unsafe_allow_html=True
@@ -1119,35 +1129,86 @@ with tab2:
         # ------------------------------------------------------
         st.markdown("#### 4) Top eventos por indicador (ranking por aeroporto)")
 
-        rank_df = (
-            df_f
-            .groupby(["indicador", "aeroporto"], as_index=False)["eventos"]
-            .sum()
+        # 🔀 Seletor do modo de ranking
+        modo_rank = st.radio(
+            "🔀 Modo de Ranking",
+            options=["Indicador por Eventos", "Indicador por Índice"],
+            horizontal=True,
+            index=0
         )
 
+        # ==============================
+        # ORDEM FIXA DOS INDICADORES
+        # ==============================
+        ordem_fixa_indicadores = [
+            "Incursão em Pista",
+            "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura",
+            "Colisão entre Veículos, Equipamentos, Estruturas",
+            "F.O.D",
+            "Colisão com Aves",
+            "Excursão de Pista",
+            "RELPREV",
+        ]
+
+        # ==============================
+        # BASE DE CÁLCULO DO RANKING
+        # ==============================
+        if modo_rank == "Indicador por Eventos":
+
+            rank_df = (
+                df_f
+                .groupby(["indicador", "aeroporto"], as_index=False)["eventos"]
+                .sum()
+            )
+
+            rank_df["valor_rank"] = rank_df["eventos"]
+
+        else:
+            base_idx = (
+                df_f
+                .groupby(["indicador", "aeroporto", "ano", "ordem_mes"], as_index=False)
+                .agg(
+                    eventos=("eventos", "sum"),
+                    mov=("mov", "max")
+                )
+            )
+
+            rank_df = (
+                base_idx
+                .groupby(["indicador", "aeroporto"], as_index=False)
+                .agg(
+                    eventos=("eventos", "sum"),
+                    mov=("mov", "sum")
+                )
+            )
+
+            rank_df["valor_rank"] = (
+                rank_df["eventos"] * 100 / rank_df["mov"]
+            ).fillna(0)
+
+        # ==============================
+        # EXIBIÇÃO
+        # ==============================
         if rank_df.empty:
             st.info("Nenhum dado disponível para o ranking.")
         else:
-            indicadores_ordem = (
-                rank_df
-                .groupby("indicador")["eventos"]
-                .sum()
-                .sort_values(ascending=False)
-                .index
-                .tolist()
-            )
+            # 🔒 garante somente indicadores existentes, mantendo a ordem fixa
+            indicadores_ordem = [
+                i for i in ordem_fixa_indicadores
+                if i in rank_df["indicador"].unique()
+            ]
 
             for indicador in indicadores_ordem:
+
                 sub = (
                     rank_df[rank_df["indicador"] == indicador]
-                    .sort_values("eventos", ascending=False)
+                    .sort_values("valor_rank", ascending=False)
                     .head(17)
                     .reset_index(drop=True)
                 )
 
                 classe_ind = classe_indicador(indicador)
 
-                # 🔽 AQUI É O RECOLHER / ABRIR
                 with st.expander(f"📌 {indicador}", expanded=False):
 
                     html_cards = '<div class="rank-grid">'
@@ -1156,26 +1217,227 @@ with tab2:
 
                         classes = ["rank-card-mini", classe_ind]
 
-                        # 🥇 Top 1
                         if pos == 0:
                             classes.append("rank-top-1")
-
-                        # 🥈🥉 Top 2 e 3
                         elif pos in [1, 2]:
                             classes.append("rank-top-3")
+
+                        if modo_rank == "Indicador por Eventos":
+                            valor_html = f"""
+                                <div class="rank-value">{fmt_int(row["eventos"])}</div>
+                                <div class="rank-label">eventos</div>
+                            """
+                        else:
+                            valor_fmt = f"{row['valor_rank']:.4f}".replace(".", ",")
+                            valor_html = f"""
+                                <div class="rank-value">{valor_fmt}</div>
+                                <div class="rank-label">índice</div>
+                            """
 
                         html_cards += (
                             f'<div class="{" ".join(classes)}">'
                             f'<div class="rank-pos">#{pos + 1}</div>'
                             f'<div class="rank-aero">{row["aeroporto"]}</div>'
-                            f'<div class="rank-value">{fmt_int(row["eventos"])}</div>'
-                            '<div class="rank-label">eventos</div>'
+                            f'{valor_html}'
                             '</div>'
                         )
 
                     html_cards += "</div>"
 
                     st.markdown(html_cards, unsafe_allow_html=True)
+
+        # ------------------------------------------------------
+        # 5) Gráfico por Indicador
+        # ------------------------------------------------------
+
+        def label_filtro(ano_sel, mes_sel):
+            # ANO
+            if ano_sel == ["Todos"]:
+                ano_txt = "ANO TODOS"
+            else:
+                ano_txt = "Ano " + ", ".join(map(str, ano_sel))
+
+            # MÊS
+            if mes_sel == ["Todos"]:
+                mes_txt = "MÊS TODOS"
+            else:
+                mes_txt = "Mês " + ", ".join(mes_sel)
+
+            return f"{ano_txt} – {mes_txt}"
+        
+        # 🔤 monta texto de ANO / MÊS selecionados
+        titulo_filtros = label_filtro(
+            st.session_state.ano_sel,
+            st.session_state.mes_sel
+        )
+
+        if modo_rank == "Indicador por Eventos":
+
+            st.markdown(
+                f"#### 5) Gráfico de Eventos por Indicador — {titulo_filtros}"
+            )
+
+            for indicador in indicadores_ordem:
+
+                sub_evt = (
+                    df_f[df_f["indicador"] == indicador]
+                    .groupby("aeroporto", as_index=False)
+                    .agg(
+                        eventos=("eventos", "sum"),
+                        mov=("mov", "sum")
+                    )
+                    .sort_values("aeroporto")  # 🔠 ordem alfabética
+                    .reset_index(drop=True)
+                )
+
+                if sub_evt.empty:
+                    continue
+
+                # 🔤 eixo X com aeroporto + movimentação
+                sub_evt["label_x"] = (
+                    sub_evt["aeroporto"]
+                    + "<br><span style='font-size:11px'>"
+                    + sub_evt["mov"].map(fmt_int)
+                    + "</span>"
+                )
+
+                with st.expander(f"📌 {indicador}", expanded=True):
+
+                    fig_evt = px.bar(
+                        sub_evt,
+                        x="label_x",
+                        y="eventos",
+                        text=sub_evt["eventos"].map(fmt_int),
+                    )
+
+                    # 🔧 limite superior com folga (EVITA CORTE)
+                    y_max = sub_evt["eventos"].max()
+                    y_lim = y_max * 1.25 if y_max > 0 else 1
+
+                    fig_evt.update_traces(
+                        marker_color="#96CE00",
+                        textposition="outside",
+                        cliponaxis=False,
+                        textfont=dict(
+                            color="#000000",
+                            size=13,
+                            family="Arial Black"
+                        )
+                    )
+
+                    fig_evt.update_layout(
+                        showlegend=False,
+
+                        xaxis_title=None,
+                        yaxis_title=None,
+
+                        xaxis=dict(
+                            showgrid=False,
+                            zeroline=False,
+                            tickfont=dict(
+                                color="#000000",
+                                size=13,
+                                family="Arial Black"
+                            )
+                        ),
+                        yaxis=dict(
+                            showgrid=False,
+                            zeroline=False,
+                            range=[0, y_lim],
+                            tickfont=dict(
+                                color="#000000",
+                                size=13,
+                                family="Arial Black"
+                            )
+                        ),
+
+                        uniformtext_minsize=12,
+                        uniformtext_mode="show",
+
+                        margin=dict(
+                            l=40,
+                            r=30,
+                            t=80,
+                            b=100
+                        ),
+                        height=420,
+                    )
+
+                    st.plotly_chart(fig_evt, use_container_width=True)
+        # ------------------------------------------------------
+        # 5) Gráfico de Índice por Indicador (LINHA)
+        # ------------------------------------------------------
+        elif modo_rank == "Indicador por Índice":
+
+            st.markdown(
+                f"#### 5) Gráfico de Índice por Indicador — {titulo_filtros}"
+            )
+
+            for indicador in indicadores_ordem:
+
+                sub = (
+                    rank_df[rank_df["indicador"] == indicador]
+                    .sort_values("aeroporto")
+                    .reset_index(drop=True)
+                )
+
+                if sub.empty:
+                    continue
+
+                with st.expander(f"📌 {indicador}", expanded=True):
+
+                    fig_idx = px.line(
+                        sub,
+                        x="aeroporto",
+                        y="valor_rank",
+                        markers=True,
+                        text=sub["valor_rank"].apply(
+                            lambda x: f"{x:.3f}".replace(".", ",")
+                        ),
+                    )
+
+                    fig_idx.update_traces(
+                        textposition="top center",
+                        marker=dict(size=10),
+                        line=dict(width=3, color="#96CE00"),
+                        textfont=dict(
+                            color="#000000",
+                            size=13,
+                            family="Arial Black"
+                        )
+                    )
+
+                    fig_idx.update_layout(
+                        xaxis_title=None,
+                        yaxis_title=None,
+                        showlegend=False,
+                        xaxis=dict(
+                            showgrid=False,
+                            zeroline=False,
+                            tickfont=dict(
+                                color="#000000",
+                                size=13,
+                                family="Arial Black"
+                            )
+                        ),
+                        yaxis=dict(
+                            showgrid=False,
+                            zeroline=False,
+                            tickfont=dict(
+                                color="#000000",
+                                size=13,
+                                family="Arial Black"
+                            )
+                        ),
+                        margin=dict(l=40, r=30, t=30, b=60),
+                        height=420,
+                    )
+
+                    st.plotly_chart(
+                        fig_idx,
+                        use_container_width=True,
+                        key=f"graf_idx_{modo_rank}_{indicador}"
+                    )
 
 with tab4:
     st.markdown("### 📋 Ocorrências & Comparativos")
@@ -1185,19 +1447,30 @@ with tab4:
         st.info("Sem dados com os filtros atuais.")
     else:
         # ------------------------------------------------------
-        # 5) Comparativo de Aeroportos (colunas)
+        # 5) Comparativo de Aeroportos (Eventos x Índice)
         # ------------------------------------------------------
         st.markdown("#### 5) Comparativo de Aeroportos")
 
+        # 🔀 Modo de comparação
+        modo_cmp = st.radio(
+            "🔀 Modo de Comparação",
+            options=["Comparar por Eventos", "Comparar por Índice"],
+            horizontal=True,
+            index=0,
+            key="modo_cmp_tab5"
+        )
+
         comp_aero_opts = sorted(df["aeroporto"].dropna().unique().tolist())
+
         if len(comp_aero_opts) >= 2:
+
             ca1, ca2 = st.columns(2)
             with ca1:
                 aero_a = st.selectbox(
                     "Aeroporto A",
                     options=comp_aero_opts,
                     index=0,
-                    key="cmp_aero_a_tab4"
+                    key="cmp_aero_a_tab5"
                 )
             with ca2:
                 idx_b = 1 if comp_aero_opts[0] != comp_aero_opts[1] else 0
@@ -1205,7 +1478,7 @@ with tab4:
                     "Aeroporto B",
                     options=comp_aero_opts,
                     index=idx_b,
-                    key="cmp_aero_b_tab4"
+                    key="cmp_aero_b_tab5"
                 )
 
             base_cmp = df.copy()
@@ -1216,12 +1489,52 @@ with tab4:
             if sel_ind:
                 base_cmp = base_cmp[base_cmp["indicador"].isin(sel_ind)]
 
-            cmp = (
-                base_cmp[base_cmp["aeroporto"].isin([aero_a, aero_b])]
-                .groupby(["aeroporto", "ordem_mes", "mes_abrev"], as_index=False)["eventos"]
-                .sum()
-            )
+            # ======================================================
+            # BASE POR EVENTOS
+            # ======================================================
+            if modo_cmp == "Comparar por Eventos":
 
+                cmp = (
+                    base_cmp[base_cmp["aeroporto"].isin([aero_a, aero_b])]
+                    .groupby(["aeroporto", "ordem_mes", "mes_abrev"], as_index=False)["eventos"]
+                    .sum()
+                )
+
+                cmp["valor"] = cmp["eventos"]
+                eixo_y = "valor"
+                label_y = "eventos"
+                texto = cmp["valor"].map(fmt_int)
+
+            # ======================================================
+            # BASE POR ÍNDICE (EVENTOS * 100 / MOV)
+            # ======================================================
+            else:
+                base_idx = (
+                    base_cmp[base_cmp["aeroporto"].isin([aero_a, aero_b])]
+                    .groupby(["aeroporto", "ordem_mes", "mes_abrev", "ano"], as_index=False)
+                    .agg(
+                        eventos=("eventos", "sum"),
+                        mov=("mov", "max")
+                    )
+                )
+
+                cmp = (
+                    base_idx
+                    .groupby(["aeroporto", "ordem_mes", "mes_abrev"], as_index=False)
+                    .agg(
+                        eventos=("eventos", "sum"),
+                        mov=("mov", "sum")
+                    )
+                )
+
+                cmp["valor"] = (cmp["eventos"] * 100 / cmp["mov"]).fillna(0)
+                eixo_y = "valor"
+                label_y = "índice"
+                texto = cmp["valor"].apply(lambda x: f"{x:.3f}".replace(".", ","))
+
+            # ======================================================
+            # ORDENAÇÃO DE MESES
+            # ======================================================
             cmp["mes_abrev"] = pd.Categorical(
                 cmp["mes_abrev"],
                 categories=ORDEM_MESES_ABREV,
@@ -1229,39 +1542,39 @@ with tab4:
             )
             cmp = cmp.sort_values(["ordem_mes", "aeroporto"])
 
+            # ======================================================
+            # GRÁFICO
+            # ======================================================
             color_map = {aero_a: ACCENT, aero_b: "#2BB7FF"}
 
             fig_cmp = px.bar(
                 cmp,
                 x="mes_abrev",
-                y="eventos",
+                y=eixo_y,
                 color="aeroporto",
-                text=cmp["eventos"].map(fmt_int),
+                text=texto,
                 color_discrete_map=color_map,
             )
 
-            # ======================================================
-            # LÓGICA DE RÓTULO (IGUAL AO GRÁFICO 2)
-            # ======================================================
+            # 🔹 lógica de rótulos
             for trace in fig_cmp.data:
                 valores = list(trace.y)
                 max_val = max(valores) if valores else 0
 
-                text_pos = []
-                text_color = []
-
+                pos, cor = [], []
                 for v in valores:
                     if v >= max_val * 0.25:
-                        text_pos.append("inside")
-                        text_color.append("white")
+                        pos.append("inside")
+                        cor.append("white")
                     else:
-                        text_pos.append("outside")
-                        text_color.append("#333")
+                        pos.append("outside")
+                        cor.append("#333")
 
-                trace.textposition = text_pos
+                trace.textposition = pos
+                trace.textangle = 0              # 🔥 força horizontal
                 trace.textfont = dict(
-                    color=text_color,
-                    size=14,
+                    color=cor,
+                    size=11,                     # 🔽 menor (ajuste se quiser)
                     family="Arial Black"
                 )
 
@@ -1277,39 +1590,40 @@ with tab4:
 
             st.plotly_chart(fig_cmp, use_container_width=True)
 
-            # ------------------------------------------------------
-            # KPIs – Comparativo A x B (TOTAL + VARIAÇÃO %)
-            # ------------------------------------------------------
-            total_a = cmp.loc[cmp["aeroporto"] == aero_a, "eventos"].sum()
-            total_b = cmp.loc[cmp["aeroporto"] == aero_b, "eventos"].sum()
+            # ======================================================
+            # KPIs
+            # ======================================================
+            total_a = cmp.loc[cmp["aeroporto"] == aero_a, "valor"].sum()
+            total_b = cmp.loc[cmp["aeroporto"] == aero_b, "valor"].sum()
 
-            if total_b > 0:
-                pct_var = (total_a - total_b) / total_b
-            else:
-                pct_var = 0
+            pct_var = (total_a - total_b) / total_b if total_b > 0 else 0
 
             def fmt_pct_cmp(v):
                 return f"{v*100:+.2f}%".replace(".", ",")
+
+            def fmt_val(v):
+                if modo_cmp == "Comparar por Eventos":
+                    return fmt_int(v)
+                else:
+                    return f"{v:.3f}".replace(".", ",")
 
             cor_a = color_map.get(aero_a, "#1a2732")
             cor_b = color_map.get(aero_b, "#1a2732")
 
             k1, k2, k3 = st.columns(3)
 
-            # 🔹 Cartão Aeroporto A
             with k1:
                 st.markdown(
                     f"""
                     <div class="kpi-card">
                         <div class="kpi-title" style="color:{cor_a};">{aero_a}</div>
-                        <div class="kpi-value" style="color:{cor_a};">{fmt_int(total_a)}</div>
-                        <div class="kpi-sub">eventos</div>
+                        <div class="kpi-value" style="color:{cor_a};">{fmt_val(total_a)}</div>
+                        <div class="kpi-sub">{label_y}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
 
-            # 🔸 Cartão Variação %
             with k2:
                 cor_var = "up" if pct_var > 0 else "down" if pct_var < 0 else "flat"
                 st.markdown(
@@ -1323,14 +1637,13 @@ with tab4:
                     unsafe_allow_html=True,
                 )
 
-            # 🔹 Cartão Aeroporto B
             with k3:
                 st.markdown(
                     f"""
                     <div class="kpi-card">
                         <div class="kpi-title" style="color:{cor_b};">{aero_b}</div>
-                        <div class="kpi-value" style="color:{cor_b};">{fmt_int(total_b)}</div>
-                        <div class="kpi-sub">eventos</div>
+                        <div class="kpi-value" style="color:{cor_b};">{fmt_val(total_b)}</div>
+                        <div class="kpi-sub">{label_y}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
