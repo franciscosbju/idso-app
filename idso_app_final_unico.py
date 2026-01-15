@@ -534,7 +534,7 @@ title_placeholder = st.empty()
 title_placeholder.markdown(
     f"""
     <h1 class='app-title'>{APP_TITLE}</h1>
-    <div class='app-subtitle'>Safety Corporativa</div>
+    <div class='app-subtitle'>Safety Corporativo</div>
     <div class='app-sub'>Carregue um arquivo XLSX para iniciar</div>
     """,
     unsafe_allow_html=True
@@ -1274,7 +1274,7 @@ with tab2:
         if modo_rank == "Indicador por Eventos":
 
             st.markdown(
-                f"#### 5) Gráfico de Eventos por Indicador — {titulo_filtros}"
+                f"#### Gráfico de Eventos por Indicador — {titulo_filtros}"
             )
 
             for indicador in indicadores_ordem:
