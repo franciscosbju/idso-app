@@ -1363,7 +1363,11 @@ with tab2:
                         height=420,
                     )
 
-                    st.plotly_chart(fig_evt, use_container_width=True)
+                    st.plotly_chart(
+                        fig_evt,
+                        use_container_width=True,
+                        key=f"evt_{modo_rank}_{indicador}"
+                    )
         # ------------------------------------------------------
         # 5) Gráfico de Índice por Indicador (LINHA)
         # ------------------------------------------------------
@@ -1383,6 +1387,9 @@ with tab2:
 
                 if sub.empty:
                     continue
+
+                # 🔥 VERIFICA SE TODOS OS VALORES SÃO ZERO
+                todos_zero = (sub["valor_rank"].abs().sum() == 0)
 
                 with st.expander(f"📌 {indicador}", expanded=True):
 
@@ -1411,6 +1418,7 @@ with tab2:
                         xaxis_title=None,
                         yaxis_title=None,
                         showlegend=False,
+
                         xaxis=dict(
                             showgrid=False,
                             zeroline=False,
@@ -1420,15 +1428,23 @@ with tab2:
                                 family="Arial Black"
                             )
                         ),
+
                         yaxis=dict(
                             showgrid=False,
                             zeroline=False,
+
+                            # 🔥 SE TUDO FOR ZERO → MOSTRA SÓ O 0
+                            tickmode="array" if todos_zero else "auto",
+                            tickvals=[0] if todos_zero else None,
+                            range=[-0.05, 0.05] if todos_zero else None,
+
                             tickfont=dict(
                                 color="#000000",
                                 size=13,
                                 family="Arial Black"
                             )
                         ),
+
                         margin=dict(l=40, r=30, t=30, b=60),
                         height=420,
                     )
@@ -1588,7 +1604,11 @@ with tab4:
                 margin=dict(l=10, r=10, t=15, b=10),
             )
 
-            st.plotly_chart(fig_cmp, use_container_width=True)
+            st.plotly_chart(
+                fig_cmp,
+                use_container_width=True,
+                key=f"cmp_{modo_cmp}_{aero_a}_{aero_b}"
+            )
 
             # ======================================================
             # KPIs
