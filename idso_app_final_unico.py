@@ -1002,6 +1002,13 @@ with tab2:
                 for i, ano in enumerate(anos_disp)
             }
 
+        # ✅ PATCH CRÍTICO — evita KeyError em novos anos (ex: 2026, 2027…)
+        for ano in anos_disp:
+            if ano not in st.session_state.color_map_anos:
+                st.session_state.color_map_anos[ano] = base_colors[
+                    len(st.session_state.color_map_anos) % len(base_colors)
+                ]
+
         with st.expander("🎨 Ajustar cores das linhas (anos)", expanded=False):
             cols = st.columns(3)
             for i, ano in enumerate(anos_disp):
@@ -1750,177 +1757,214 @@ with tab4:
             st.markdown("---")
             st.markdown("### 🎯 6) Acompanhamento de Metas")
 
-            METAS = {
-                "SBJU": {
-                "Incursão em Pista": 3,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 7,
-                "Colisão com Aves": 40,
-                "RELPREV": 15,
-            },
+            # ======================================================
+            # 🎯 METAS POR ANO (2020–2025 = base / 2026 altera SBSP)
+            # ======================================================
+            METAS_POR_ANO = {
 
-            "SBCG": {
-                "Incursão em Pista": 4,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 50,
-                "RELPREV": 30,
-            },
+                2025: {
 
-            "SBCJ": {
-                "Incursão em Pista": 2,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 20,
-            },
+                    "SBJU": {
+                        "Incursão em Pista": 3,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 7,
+                        "Colisão com Aves": 40,
+                        "RELPREV": 15,
+                    },
 
-            "SBCR": {
-                "Incursão em Pista": 2,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 20,
-            },
+                    "SBCG": {
+                        "Incursão em Pista": 4,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 50,
+                        "RELPREV": 30,
+                    },
 
-            "SBHT": {
-                "Incursão em Pista": 2,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                "F.O.D": 10,
-                "Colisão com Aves": 25,
-                "RELPREV": 20,
-            },
+                    "SBCJ": {
+                        "Incursão em Pista": 2,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 20,
+                    },
 
-            "SBJP": {
-                "Incursão em Pista": 5,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 50,
-                "RELPREV": 35,
-            },
+                    "SBCR": {
+                        "Incursão em Pista": 2,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 20,
+                    },
 
-            "SBKG": {
-                "Incursão em Pista": 3,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 5,
-                "Colisão com Aves": 30,
-                "RELPREV": 15,
-            },
+                    "SBHT": {
+                        "Incursão em Pista": 2,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 25,
+                        "RELPREV": 20,
+                    },
 
-            "SBMA": {
-                "Incursão em Pista": 3,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 20,
-            },
+                    "SBJP": {
+                        "Incursão em Pista": 5,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 50,
+                        "RELPREV": 35,
+                    },
 
-            "SBMK": {
-                "Incursão em Pista": 3,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 20,
-            },
+                    "SBKG": {
+                        "Incursão em Pista": 3,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 5,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 15,
+                    },
 
-            "SBMO": {
-                "Incursão em Pista": 5,
-                "Excursão de Pista": 0,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                "F.O.D": 8,
-                "Colisão com Aves": 50,
-                "RELPREV": 55,
-            },
+                    "SBMA": {
+                        "Incursão em Pista": 3,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 20,
+                    },
 
-            "SBPP": {
-                "Incursão em Pista": 2,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 20,
-            },
+                    "SBMK": {
+                        "Incursão em Pista": 3,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 20,
+                    },
 
-            "SBRF": {
-                "Incursão em Pista": 7,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 5,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 12,
-                "F.O.D": 15,
-                "Colisão com Aves": 144,
-                "RELPREV": 150,
-            },
+                    "SBMO": {
+                        "Incursão em Pista": 5,
+                        "Excursão de Pista": 0,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 8,
+                        "Colisão com Aves": 50,
+                        "RELPREV": 55,
+                    },
 
-            "SBSN": {
-                "Incursão em Pista": 3,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 31,
-            },
+                    "SBPP": {
+                        "Incursão em Pista": 2,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 20,
+                    },
 
-            "SBSP": {
-                "Incursão em Pista": 4,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 6,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 50,
-                "F.O.D": 67,
-                "Colisão com Aves": 52,
-                "RELPREV": 300,
-            },
+                    "SBRF": {
+                        "Incursão em Pista": 7,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 5,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 12,
+                        "F.O.D": 15,
+                        "Colisão com Aves": 144,
+                        "RELPREV": 150,
+                    },
 
-            "SBUL": {
-                "Incursão em Pista": 4,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 50,
-                "RELPREV": 30,
-            },
+                    "SBSN": {
+                        "Incursão em Pista": 3,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 31,
+                    },
 
-            "SBUR": {
-                "Incursão em Pista": 2,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                "F.O.D": 10,
-                "Colisão com Aves": 30,
-                "RELPREV": 20,
-            },
+                    "SBSP": {
+                        "Incursão em Pista": 4,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 6,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 50,
+                        "F.O.D": 67,
+                        "Colisão com Aves": 52,
+                        "RELPREV": 300,
+                    },
 
-            "SBAR": {
-                "Incursão em Pista": 5,
-                "Excursão de Pista": 1,
-                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                "F.O.D": 10,
-                "Colisão com Aves": 40,
-                "RELPREV": 30,
-            },
+                    "SBUL": {
+                        "Incursão em Pista": 4,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 50,
+                        "RELPREV": 30,
+                    },
+
+                    "SBUR": {
+                        "Incursão em Pista": 2,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 30,
+                        "RELPREV": 20,
+                    },
+
+                    "SBAR": {
+                        "Incursão em Pista": 5,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
+                        "Colisão com Aves": 40,
+                        "RELPREV": 30,
+                    },
+                },
+
+                # 2026: define SOMENTE o que muda (SBSP)
+                2026: {
+                    "SBSP": {
+                        "Incursão em Pista": 5,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 10,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 70,
+                        "F.O.D": 29,
+                        "Colisão com Aves": 72,
+                        "RELPREV": 400,
+                    }
+                }
             }
+
+            # ======================================================
+            # ✅ Seleciona meta do ano com "herança" automática:
+            # 2027+ usa a última definida (2026)
+            # ======================================================
+            ano_sel = int(st.session_state.ano_sel[0])
+
+            anos_disponiveis = sorted(METAS_POR_ANO.keys())
+            ano_base = max((a for a in anos_disponiveis if a <= ano_sel), default=anos_disponiveis[-1])
+
+            # base (2025)
+            METAS = METAS_POR_ANO[ano_base].copy()
+
+            # aplica override do ano selecionado (se existir) por aeroporto/indicador
+            if ano_sel in METAS_POR_ANO:
+                for aero, metas_aero in METAS_POR_ANO[ano_sel].items():
+                    METAS.setdefault(aero, {}).update(metas_aero)
 
             import streamlit.components.v1 as components
 
