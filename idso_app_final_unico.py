@@ -269,6 +269,82 @@ st.markdown(
         margin: 0 !important;
     }}
 
+    /* ======================================================
+    🎯 METAS — GRID ELEGANTE (IGUAL AO RANKING)
+    ====================================================== */
+
+    .metas-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 18px;
+        margin-top: 14px;
+        margin-bottom: 28px;
+    }}
+
+    .meta-card {{
+        background: #f8f9fb;
+        border-radius: 18px;
+        padding: 18px 16px;
+        border: 2px solid rgba(0,0,0,0.06);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+        text-align: center;
+        position: relative;
+    }}
+
+    .meta-title {{
+        font-size: 16px;
+        font-weight: 1000;
+        color: #1a2732;
+        margin-bottom: 6px;
+    }}
+
+    .meta-aero {{
+        font-size: 12px;
+        font-weight: 900;
+        color: #6b7c93;
+        letter-spacing: 0.3px;
+        margin-bottom: 10px;
+    }}
+
+    .meta-value {{
+        font-size: 40px;
+        font-weight: 1000;
+        line-height: 1.1;
+        margin-bottom: 6px;
+    }}
+
+    .meta-sub {{
+        font-size: 13px;
+        font-weight: 900;
+        color: #5b6b7b;
+    }}
+
+    /* Selo de status */
+    .meta-badge {{
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        font-size: 11px;
+        font-weight: 1000;
+        padding: 4px 10px;
+        border-radius: 999px;
+    }}
+
+    .meta-ok {{
+        background: #e8f6d8;
+        color: #5ca000;
+    }}
+
+    .meta-warn {{
+        background: #fff3cd;
+        color: #b78103;
+    }}
+
+    .meta-bad {{
+        background: #ffe2e5;
+        color: #c62828;
+    }}
+
     </style>
     """,
     unsafe_allow_html=True
@@ -816,7 +892,7 @@ st.markdown(stat_banner_years(df_f), unsafe_allow_html=True)
 # ======================================================
 # TABS
 # ======================================================
-tab1, tab2, tab4, tab3 = st.tabs(["⏱️ Pendências IDSO", "📊 Análises & Gráficos", "📋 Ocorrências & Comparativos", "📦 Exportações"])
+tab1, tab2, tab4, tab3 = st.tabs(["⏱️ Pendências IDSO", "📊 Análises & Gráficos", "📋 Comparativos & Metas", "📦 Exportações"])
 
 with tab1:
     st.markdown("### ⏱️ Pendências de lançamento do IDSO (prazo: dia 10)")
@@ -1456,7 +1532,7 @@ with tab2:
                     )
 
 with tab4:
-    st.markdown("### 📋 Ocorrências & Comparativos")
+    st.markdown("### 📋 Comparativos & Metas")
     st.caption("Painel consolidado e comparativo entre aeroportos. Use os filtros globais para definir o recorte (Ano/Mês/Indicador).")
 
     if df_f.empty:
@@ -1669,8 +1745,578 @@ with tab4:
                     unsafe_allow_html=True,
                 )
 
-        else:
-            st.info("Base insuficiente para comparar aeroportos.")
+            # ⬅️ AQUI O BLOCO ACABOU (coluna 0)
+
+            st.markdown("---")
+            st.markdown("### 🎯 6) Acompanhamento de Metas")
+
+            METAS = {
+                "SBJU": {
+                "Incursão em Pista": 3,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 7,
+                "Colisão com Aves": 40,
+                "RELPREV": 15,
+            },
+
+            "SBCG": {
+                "Incursão em Pista": 4,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 50,
+                "RELPREV": 30,
+            },
+
+            "SBCJ": {
+                "Incursão em Pista": 2,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 20,
+            },
+
+            "SBCR": {
+                "Incursão em Pista": 2,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 20,
+            },
+
+            "SBHT": {
+                "Incursão em Pista": 2,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                "F.O.D": 10,
+                "Colisão com Aves": 25,
+                "RELPREV": 20,
+            },
+
+            "SBJP": {
+                "Incursão em Pista": 5,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 50,
+                "RELPREV": 35,
+            },
+
+            "SBKG": {
+                "Incursão em Pista": 3,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 5,
+                "Colisão com Aves": 30,
+                "RELPREV": 15,
+            },
+
+            "SBMA": {
+                "Incursão em Pista": 3,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 20,
+            },
+
+            "SBMK": {
+                "Incursão em Pista": 3,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 20,
+            },
+
+            "SBMO": {
+                "Incursão em Pista": 5,
+                "Excursão de Pista": 0,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                "F.O.D": 8,
+                "Colisão com Aves": 50,
+                "RELPREV": 55,
+            },
+
+            "SBPP": {
+                "Incursão em Pista": 2,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 20,
+            },
+
+            "SBRF": {
+                "Incursão em Pista": 7,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 5,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 12,
+                "F.O.D": 15,
+                "Colisão com Aves": 144,
+                "RELPREV": 150,
+            },
+
+            "SBSN": {
+                "Incursão em Pista": 3,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 31,
+            },
+
+            "SBSP": {
+                "Incursão em Pista": 4,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 6,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 50,
+                "F.O.D": 67,
+                "Colisão com Aves": 52,
+                "RELPREV": 300,
+            },
+
+            "SBUL": {
+                "Incursão em Pista": 4,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 50,
+                "RELPREV": 30,
+            },
+
+            "SBUR": {
+                "Incursão em Pista": 2,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                "F.O.D": 10,
+                "Colisão com Aves": 30,
+                "RELPREV": 20,
+            },
+
+            "SBAR": {
+                "Incursão em Pista": 5,
+                "Excursão de Pista": 1,
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                "F.O.D": 10,
+                "Colisão com Aves": 40,
+                "RELPREV": 30,
+            },
+            }
+
+            import streamlit.components.v1 as components
+
+            # ======================================================
+            # 🎯 ACOMPANHAMENTO DE METAS — GRID ELEGANTE (HTML REAL)
+            # ======================================================
+
+            def meta_card_kpi(indicador, aeroporto_label, valor, meta):
+
+                pct = (valor / meta) if meta > 0 else 0
+                pct_pct = pct * 100
+                pct_bar = min(pct_pct, 150)
+
+                nome_ind = indicador.upper()
+
+                # 🔵 REGRA ESPECIAL — RELPREV (quanto MAIOR, melhor)
+                if "RELPREV" in nome_ind:
+                    bar_color = "#96CE00" if valor >= meta else "#ff5a5f"
+
+                # 🔴 REGRA PADRÃO — DEMAIS INDICADORES (quanto MENOR, melhor)
+                else:
+                    if pct < 0.8:
+                        bar_color = "#96CE00"
+                    elif pct < 1:
+                        bar_color = "#ffb703"
+                    else:
+                        bar_color = "#ff5a5f"
+
+                return f"""
+                <div class="meta-card">
+                    <div class="meta-title">{indicador}</div>
+                    <div class="meta-aero">{aeroporto_label}</div>
+
+                    <div class="meta-value" style="color:{bar_color};">
+                        {fmt_int(valor)}
+                    </div>
+
+                    <div class="meta-sub">
+                        Meta: {fmt_int(meta)}
+                    </div>
+
+                    <div class="meta-bar">
+                        <div class="meta-bar-fill"
+                            style="width:{pct_bar:.1f}%; background:{bar_color};">
+                        </div>
+                    </div>
+
+                    <div class="meta-pct">
+                        {pct_pct:.1f}% da meta
+                    </div>
+                </div>
+                """
+
+            # ======================================================
+            # 📌 ORDEM FIXA (NUNCA MUDA)
+            # ======================================================
+            ordem_indicadores = [
+                "Incursão em Pista",
+                "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura",
+                "Colisão entre Veículos, Equipamentos, Estruturas",
+                "F.O.D",
+                "Colisão com Aves",
+                "Excursão de Pista",
+                "RELPREV",
+            ]
+
+            # ======================================================
+            # 🔎 INDICADORES A EXIBIR (RESPEITA FILTRO E ORDEM)
+            # ======================================================
+            if st.session_state.ind_sel == ["Todos"]:
+                indicadores_grid = ordem_indicadores
+            else:
+                indicadores_grid = [
+                    ind for ind in ordem_indicadores
+                    if ind in st.session_state.ind_sel
+                ]
+
+            # ======================================================
+            # 🧱 MONTA HTML
+            # ======================================================
+            html_cards = '<div class="metas-grid">'
+
+            # ======================================================
+            # CASO 1 — TODOS OS AEROPORTOS
+            # ======================================================
+            if st.session_state.aero_sel == ["Todos"]:
+
+                aeroporto_label = "Todos os Aeroportos"
+
+                for ind in indicadores_grid:
+
+                    valor_total = (
+                        df_f[df_f["indicador"] == ind]["eventos"].sum()
+                        if not df_f.empty else 0
+                    )
+
+                    meta_total = sum(metas.get(ind, 0) for metas in METAS.values())
+
+                    if meta_total == 0:
+                        continue
+
+                    html_cards += meta_card_kpi(
+                        indicador=ind,
+                        aeroporto_label=aeroporto_label,
+                        valor=int(valor_total),
+                        meta=int(meta_total),
+                    )
+
+            # ======================================================
+            # CASO 2 — AEROPORTO ESPECÍFICO
+            # ======================================================
+            else:
+                aeroporto = st.session_state.aero_sel[0]
+                aeroporto_label = aeroporto
+
+                for ind in indicadores_grid:
+
+                    if ind not in METAS.get(aeroporto, {}):
+                        continue
+
+                    valor_total = (
+                        df_f[
+                            (df_f["aeroporto"] == aeroporto) &
+                            (df_f["indicador"] == ind)
+                        ]["eventos"].sum()
+                        if not df_f.empty else 0
+                    )
+
+                    meta_valor = METAS[aeroporto][ind]
+
+                    html_cards += meta_card_kpi(
+                        indicador=ind,
+                        aeroporto_label=aeroporto_label,
+                        valor=int(valor_total),
+                        meta=int(meta_valor),
+                    )
+
+            html_cards += "</div>"
+
+            # ======================================================
+            # 🎨 RENDERIZAÇÃO FINAL
+            # ======================================================
+            components.html(
+            f"""
+            <div style="width:100%; overflow: visible;">
+                <style>
+                    .metas-grid {{
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                        gap: 18px;
+                        margin-top: 16px;
+                        margin-bottom: 28px;
+                    }}
+
+                    .meta-card {{
+                        background: #f8f9fb;
+                        border: 2px solid rgba(0,0,0,0.08);
+                        border-radius: 16px;
+                        padding: 16px 14px;
+                        text-align: center;
+                        box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 6px;
+                    }}
+
+                    .meta-title {{
+                        font-size: 16px;
+                        font-weight: 1000;
+                        color: #1a2732;
+                        min-height: 56px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        text-align: center;
+                    }}
+
+                    .meta-aero {{
+                        font-size: 11px;
+                        font-weight: 900;
+                        color: #6b7c93;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                    }}
+
+                    .meta-value {{
+                        font-size: 42px;
+                        font-weight: 1000;
+                        min-height: 48px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }}
+
+                    .meta-sub {{
+                        font-size: 16px;
+                        font-weight: 1000;
+                        color: #5b6b7b;
+                    }}
+
+                    .meta-bar {{
+                        background: #e5e7eb;
+                        border-radius: 999px;
+                        height: 10px;
+                        overflow: hidden;
+                    }}
+
+                    .meta-bar-fill {{
+                        height: 100%;
+                        border-radius: 999px;
+                        transition: width 0.6s ease;
+                    }}
+
+                    .meta-pct {{
+                        font-size: 14px;
+                        font-weight: 1000;
+                        color: #1a2732;
+                    }}
+                </style>
+
+                {html_cards}
+            </div>
+            """,
+            height=620,
+            scrolling=False
+            )
+        
+        # ======================================================
+        # 🎯 STATUS DAS METAS POR AEROPORTO (BLOCO SEPARADO)
+        # ======================================================
+
+        # ⚠️ CASO 1 — ANO = TODOS
+        if st.session_state.ano_sel == ["Todos"]:
+
+            st.info("⚠️ Favor selecionar o **Ano** para visualizar o status das metas.")
+
+        # ✅ CASO 2 — UM ÚNICO ANO SELECIONADO
+        elif (
+            len(st.session_state.ano_sel) == 1
+            and not df.empty
+        ):
+
+            ano_ref = st.session_state.ano_sel[0]
+
+            st.markdown("### 🎯 Status das Metas por Aeroporto")
+            st.caption(f"Avaliação consolidada • Ano {ano_ref}")
+
+            # ======================================================
+            # 🔎 BASE PARA STATUS
+            # - respeita ANO
+            # ======================================================
+            df_base_status = df[df["ano"] == ano_ref]
+
+            # ======================================================
+            # 🔎 DEFINE INDICADORES A AVALIAR
+            # ======================================================
+            if st.session_state.ind_sel == ["Todos"]:
+                indicadores_status = None
+            else:
+                indicadores_status = st.session_state.ind_sel
+
+            # ======================================================
+            # 🔎 DEFINE AEROPORTOS A AVALIAR  ✅ NOVO
+            # ======================================================
+            if st.session_state.aero_sel == ["Todos"]:
+                aeroportos_status = METAS.keys()
+            else:
+                aeroportos_status = st.session_state.aero_sel
+
+            atingiram = []
+            nao_atingiram = []
+
+            # ======================================================
+            # 🔄 LOOP POR AEROPORTO (RESPEITA FILTRO)
+            # ======================================================
+            for aeroporto in aeroportos_status:
+
+                if aeroporto not in METAS:
+                    continue
+
+                metas_aero = METAS[aeroporto]
+
+                df_aero = df_base_status[df_base_status["aeroporto"] == aeroporto]
+                if df_aero.empty:
+                    continue
+
+                ok = True
+
+                # ======================================================
+                # 🔄 LOOP POR INDICADOR
+                # ======================================================
+                for indicador, meta in metas_aero.items():
+
+                    # ⛔ RESPEITA FILTRO DE INDICADOR
+                    if indicadores_status is not None and indicador not in indicadores_status:
+                        continue
+
+                    valor = df_aero[df_aero["indicador"] == indicador]["eventos"].sum()
+
+                    if meta == 0:
+                        continue
+
+                    # 🔵 REGRA ESPECIAL — RELPREV
+                    if "RELPREV" in indicador.upper():
+                        if valor < meta:
+                            ok = False
+                            break
+                    # 🔴 REGRA PADRÃO — demais indicadores
+                    else:
+                        if valor > meta:
+                            ok = False
+                            break
+
+                if ok:
+                    atingiram.append(aeroporto)
+                else:
+                    nao_atingiram.append(aeroporto)
+
+            # ======================================================
+            # 🎨 FUNÇÃO DE RENDERIZAÇÃO
+            # ======================================================
+            def bloco_aero(lista, titulo, cor_borda, cor_fundo):
+
+                if not lista:
+                    return ""
+
+                cards = ""
+                for aero in sorted(lista):
+                    cards += f"""
+                    <div class="status-card" style="
+                        border: 2px solid {cor_borda};
+                        background: {cor_fundo};
+                    ">
+                        <div class="status-aero">{aero}</div>
+                    </div>
+                    """
+
+                return f"""
+                <div class="status-group">
+                    <div class="status-title">{titulo}</div>
+                    <div class="status-grid">
+                        {cards}
+                    </div>
+                </div>
+                """
+
+            # ======================================================
+            # 🖼️ HTML FINAL
+            # ======================================================
+            status_html = f"""
+            <style>
+                .status-group {{
+                    margin-top: 18px;
+                    margin-bottom: 28px;
+                }}
+
+                .status-title {{
+                    font-size: 18px;
+                    font-weight: 1000;
+                    color: #1a2732;
+                    margin-bottom: 10px;
+                }}
+
+                .status-grid {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                    gap: 12px;
+                }}
+
+                .status-card {{
+                    border-radius: 14px;
+                    padding: 14px 10px;
+                    text-align: center;
+                    font-weight: 1000;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+                }}
+
+                .status-aero {{
+                    font-size: 16px;
+                    letter-spacing: 0.5px;
+                }}
+            </style>
+
+            {bloco_aero(atingiram, "🟢 Aeroportos que atingiram as metas", "#96CE00", "#f1f8e9")}
+            {bloco_aero(nao_atingiram, "🔴 Aeroportos que não atingiram as metas", "#ff5a5f", "#fdecea")}
+            """
+
+            components.html(
+                f"""
+                <div style="width:100%; overflow: visible;">
+                    {status_html}
+                </div>
+                """,
+                height=360,
+                scrolling=False
+            )
 
 with tab3:
     st.markdown("### 📦 Exportações")
