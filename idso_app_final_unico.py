@@ -892,7 +892,11 @@ st.markdown(stat_banner_years(df_f), unsafe_allow_html=True)
 # ======================================================
 # TABS
 # ======================================================
-tab1, tab2, tab4, tab3 = st.tabs(["⏱️ Pendências IDSO", "📊 Análises & Gráficos", "📋 Comparativos & Metas", "📦 Exportações"])
+tab1, tab2, tab3 = st.tabs([
+    "⏱️ Pendências IDSO",
+    "📊 Análises & Gráficos",
+    "📦 Exportações"
+])
 
 with tab1:
     st.markdown("### ⏱️ Pendências de lançamento do IDSO (prazo: dia 10)")
@@ -1061,6 +1065,7 @@ with tab2:
         # ------------------------------------------------------
         # 2) Participação por indicador
         # ------------------------------------------------------
+        st.markdown("---")
         st.markdown("#### 2) Participação por indicador")
 
         ind_sum = (
@@ -1151,6 +1156,7 @@ with tab2:
         # ------------------------------------------------------
         # 3) Total de eventos por ano (barras verdes + rótulo branco)
         # ------------------------------------------------------
+        st.markdown("---")
         st.markdown("#### 3) Total de eventos por ano")
 
         byy = (
@@ -1210,6 +1216,7 @@ with tab2:
         # ------------------------------------------------------
         # 4) Top eventos por indicador (ranking por aeroporto)
         # ------------------------------------------------------
+        st.markdown("---")
         st.markdown("#### 4) Top eventos por indicador (ranking por aeroporto)")
 
         # 🔀 Seletor do modo de ranking
@@ -1357,7 +1364,7 @@ with tab2:
         if modo_rank == "Indicador por Eventos":
 
             st.markdown(
-                f"#### Gráfico de Eventos por Indicador — {titulo_filtros}"
+                f"#### 5) Gráfico de Eventos por Indicador — {titulo_filtros}"
             )
 
             for indicador in indicadores_ordem:
@@ -1384,7 +1391,7 @@ with tab2:
                     + "</span>"
                 )
 
-                with st.expander(f"📌 {indicador}", expanded=True):
+                with st.expander(f"📌 {indicador}", expanded=False):
 
                     fig_evt = px.bar(
                         sub_evt,
@@ -1474,7 +1481,7 @@ with tab2:
                 # 🔥 VERIFICA SE TODOS OS VALORES SÃO ZERO
                 todos_zero = (sub["valor_rank"].abs().sum() == 0)
 
-                with st.expander(f"📌 {indicador}", expanded=True):
+                with st.expander(f"📌 {indicador}", expanded=False):
 
                     fig_idx = px.line(
                         sub,
@@ -1538,18 +1545,15 @@ with tab2:
                         key=f"graf_idx_{modo_rank}_{indicador}"
                     )
 
-with tab4:
-    st.markdown("### 📋 Comparativos & Metas")
-    st.caption("Painel consolidado e comparativo entre aeroportos. Use os filtros globais para definir o recorte (Ano/Mês/Indicador).")
+    # ------------------------------------------------------
+    # 5) Comparativo de Aeroportos (Eventos x Índice)
+    # ------------------------------------------------------
+    st.markdown("---")
+    st.markdown("#### 6) Comparativo de Aeroportos")
 
     if df_f.empty:
         st.info("Sem dados com os filtros atuais.")
     else:
-        # ------------------------------------------------------
-        # 5) Comparativo de Aeroportos (Eventos x Índice)
-        # ------------------------------------------------------
-        st.markdown("#### 5) Comparativo de Aeroportos")
-
         # 🔀 Modo de comparação
         modo_cmp = st.radio(
             "🔀 Modo de Comparação",
@@ -1755,7 +1759,7 @@ with tab4:
             # ⬅️ AQUI O BLOCO ACABOU (coluna 0)
 
             st.markdown("---")
-            st.markdown("### 🎯 6) Acompanhamento de Metas")
+            st.markdown("### 🎯 7) Acompanhamento de Metas")
 
             # ======================================================
             # 🎯 METAS POR ANO (2020–2025 = base / 2026 altera SBSP)
