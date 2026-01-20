@@ -1951,21 +1951,37 @@ with tab4:
 
             # ======================================================
             # ✅ Seleciona meta do ano com "herança" automática:
-            # 2027+ usa a última definida (2026)
+            # - Ano = Todos → usa o MAIOR ano dos dados
+            # - 2027+ → usa a última meta definida (2026)
             # ======================================================
-            ano_sel = int(st.session_state.ano_sel[0])
 
+            # 🔒 Define ano selecionado de forma segura
+            if st.session_state.ano_sel == ["Todos"]:
+                ano_sel = int(df["ano"].dropna().astype(int).max())
+            else:
+                ano_sel = int(st.session_state.ano_sel[0])
+
+            # 🔎 Anos de metas disponíveis
             anos_disponiveis = sorted(METAS_POR_ANO.keys())
-            ano_base = max((a for a in anos_disponiveis if a <= ano_sel), default=anos_disponiveis[-1])
 
-            # base (2025)
-            METAS = METAS_POR_ANO[ano_base].copy()
+            # 🔁 Ano base (herança)
+            ano_base = max(
+                (a for a in anos_disponiveis if a <= ano_sel),
+                default=anos_disponiveis[-1]
+            )
 
-            # aplica override do ano selecionado (se existir) por aeroporto/indicador
+            # 📌 Base de metas (ex: 2025)
+            METAS = {
+                aero: metas.copy()
+                for aero, metas in METAS_POR_ANO[ano_base].items()
+            }
+
+            # 🔄 Aplica override do ano selecionado (ex: SBSP em 2026)
             if ano_sel in METAS_POR_ANO:
                 for aero, metas_aero in METAS_POR_ANO[ano_sel].items():
                     METAS.setdefault(aero, {}).update(metas_aero)
 
+            # (segue o código normalmente)
             import streamlit.components.v1 as components
 
             # ======================================================
