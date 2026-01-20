@@ -1756,18 +1756,70 @@ with tab2:
                     unsafe_allow_html=True,
                 )
 
+            # ======================================================
+            # 🎯 DATAFRAME EXCLUSIVO PARA METAS
+            # - Ano = Todos → usa SOMENTE o maior ano
+            # - NÃO aplica filtro de aeroporto
+            # ======================================================
+
+            if st.session_state.ano_sel == ["Todos"]:
+                anos_metas = [int(df["ano"].dropna().astype(int).max())]
+            else:
+                anos_metas = [int(st.session_state.ano_sel[0])]
+
+            df_metas = apply_filters(
+                df,
+                aero_base,     # ⬅️ todos os aeroportos
+                anos_metas,    # ⬅️ ANO ÚNICO (regra de metas)
+                sel_ind,
+                sel_mes
+            )
+            
             # ⬅️ AQUI O BLOCO ACABOU (coluna 0)
 
             st.markdown("---")
             st.markdown("### 🎯 7) Acompanhamento de Metas")
 
             # ======================================================
-            # 🎯 METAS POR ANO (2020–2025 = base / 2026 altera SBSP)
+            # 🎯 CONTROLE LOCAL — AEROPORTO (SOMENTE METAS)
+            # ======================================================
+
+            # filtro global
+            aero_global = st.session_state.aero_sel
+
+            # CASO 1 — filtro global = Todos
+            if aero_global == ["Todos"]:
+                aero_radio_opts = ["Todos"] + aero_base
+                default_radio = "Todos"
+
+            # CASO 2 — filtro global = aeroporto específico
+            else:
+                aero_radio_opts = aero_global[:]   # ex: ["SBJU"]
+                default_radio = aero_global[0]
+
+            # inicializa state local
+            if "aero_metas" not in st.session_state:
+                st.session_state.aero_metas = default_radio
+
+            # garante consistência
+            if st.session_state.aero_metas not in aero_radio_opts:
+                st.session_state.aero_metas = default_radio
+
+            st.radio(
+                "✈️ Aeroporto (aplicado somente às Metas)",
+                options=aero_radio_opts,
+                key="aero_metas",
+                horizontal=True
+            )
+
+            aero_meta_sel = st.session_state.aero_metas
+
+
+            # ======================================================
+            # 🎯 METAS POR ANO (2025 = base / 2026 muda SBSP)
             # ======================================================
             METAS_POR_ANO = {
-
                 2025: {
-
                     "SBJU": {
                         "Incursão em Pista": 3,
                         "Excursão de Pista": 1,
@@ -1777,7 +1829,6 @@ with tab2:
                         "Colisão com Aves": 40,
                         "RELPREV": 15,
                     },
-
                     "SBCG": {
                         "Incursão em Pista": 4,
                         "Excursão de Pista": 1,
@@ -1787,7 +1838,6 @@ with tab2:
                         "Colisão com Aves": 50,
                         "RELPREV": 30,
                     },
-
                     "SBCJ": {
                         "Incursão em Pista": 2,
                         "Excursão de Pista": 1,
@@ -1797,7 +1847,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 20,
                     },
-
                     "SBCR": {
                         "Incursão em Pista": 2,
                         "Excursão de Pista": 1,
@@ -1807,7 +1856,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 20,
                     },
-
                     "SBHT": {
                         "Incursão em Pista": 2,
                         "Excursão de Pista": 1,
@@ -1817,7 +1865,6 @@ with tab2:
                         "Colisão com Aves": 25,
                         "RELPREV": 20,
                     },
-
                     "SBJP": {
                         "Incursão em Pista": 5,
                         "Excursão de Pista": 1,
@@ -1827,7 +1874,6 @@ with tab2:
                         "Colisão com Aves": 50,
                         "RELPREV": 35,
                     },
-
                     "SBKG": {
                         "Incursão em Pista": 3,
                         "Excursão de Pista": 1,
@@ -1837,7 +1883,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 15,
                     },
-
                     "SBMA": {
                         "Incursão em Pista": 3,
                         "Excursão de Pista": 1,
@@ -1847,7 +1892,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 20,
                     },
-
                     "SBMK": {
                         "Incursão em Pista": 3,
                         "Excursão de Pista": 1,
@@ -1857,7 +1901,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 20,
                     },
-
                     "SBMO": {
                         "Incursão em Pista": 5,
                         "Excursão de Pista": 0,
@@ -1867,7 +1910,6 @@ with tab2:
                         "Colisão com Aves": 50,
                         "RELPREV": 55,
                     },
-
                     "SBPP": {
                         "Incursão em Pista": 2,
                         "Excursão de Pista": 1,
@@ -1877,7 +1919,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 20,
                     },
-
                     "SBRF": {
                         "Incursão em Pista": 7,
                         "Excursão de Pista": 1,
@@ -1887,7 +1928,6 @@ with tab2:
                         "Colisão com Aves": 144,
                         "RELPREV": 150,
                     },
-
                     "SBSN": {
                         "Incursão em Pista": 3,
                         "Excursão de Pista": 1,
@@ -1897,7 +1937,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 31,
                     },
-
                     "SBSP": {
                         "Incursão em Pista": 4,
                         "Excursão de Pista": 1,
@@ -1907,7 +1946,6 @@ with tab2:
                         "Colisão com Aves": 52,
                         "RELPREV": 300,
                     },
-
                     "SBUL": {
                         "Incursão em Pista": 4,
                         "Excursão de Pista": 1,
@@ -1917,7 +1955,6 @@ with tab2:
                         "Colisão com Aves": 50,
                         "RELPREV": 30,
                     },
-
                     "SBUR": {
                         "Incursão em Pista": 2,
                         "Excursão de Pista": 1,
@@ -1927,7 +1964,6 @@ with tab2:
                         "Colisão com Aves": 30,
                         "RELPREV": 20,
                     },
-
                     "SBAR": {
                         "Incursão em Pista": 5,
                         "Excursão de Pista": 1,
@@ -1939,7 +1975,6 @@ with tab2:
                     },
                 },
 
-                # 2026: define SOMENTE o que muda (SBSP)
                 2026: {
                     "SBSP": {
                         "Incursão em Pista": 5,
@@ -1954,42 +1989,37 @@ with tab2:
             }
 
             # ======================================================
-            # ✅ Seleciona meta do ano com "herança" automática:
-            # - Ano = Todos → usa o MAIOR ano dos dados
-            # - 2027+ → usa a última meta definida (2026)
+            # ✅ REGRAS CERTAS DE ANO PARA META
+            # - Ano = Todos  → meta usa SEMPRE 2025 (base)
+            # - Ano = 2026   → aplica override (SBSP)
+            # - Ano >= 2027  → herda 2026
             # ======================================================
 
-            # 🔒 Define ano selecionado de forma segura
+            anos_metas_def = sorted(METAS_POR_ANO.keys())
+            ANO_BASE_METAS = min(anos_metas_def)     # 2025
+            ULTIMO_ANO_METAS = max(anos_metas_def)   # 2026
+
             if st.session_state.ano_sel == ["Todos"]:
-                ano_sel = int(df["ano"].dropna().astype(int).max())
+                ano_meta = ANO_BASE_METAS
             else:
-                ano_sel = int(st.session_state.ano_sel[0])
+                ano_escolhido = int(st.session_state.ano_sel[0])
+                ano_meta = min(ano_escolhido, ULTIMO_ANO_METAS)  # 2027+ vira 2026
 
-            # 🔎 Anos de metas disponíveis
-            anos_disponiveis = sorted(METAS_POR_ANO.keys())
-
-            # 🔁 Ano base (herança)
-            ano_base = max(
-                (a for a in anos_disponiveis if a <= ano_sel),
-                default=anos_disponiveis[-1]
-            )
-
-            # 📌 Base de metas (ex: 2025)
+            # base sempre 2025 (tem todos os aeroportos)
             METAS = {
                 aero: metas.copy()
-                for aero, metas in METAS_POR_ANO[ano_base].items()
+                for aero, metas in METAS_POR_ANO[ANO_BASE_METAS].items()
             }
 
-            # 🔄 Aplica override do ano selecionado (ex: SBSP em 2026)
-            if ano_sel in METAS_POR_ANO:
-                for aero, metas_aero in METAS_POR_ANO[ano_sel].items():
+            # aplica override somente se ano_meta tiver overrides (ex: 2026)
+            if ano_meta in METAS_POR_ANO and ano_meta != ANO_BASE_METAS:
+                for aero, metas_aero in METAS_POR_ANO[ano_meta].items():
                     METAS.setdefault(aero, {}).update(metas_aero)
 
-            # (segue o código normalmente)
             import streamlit.components.v1 as components
 
             # ======================================================
-            # 🎯 ACOMPANHAMENTO DE METAS — GRID ELEGANTE (HTML REAL)
+            # 🎯 ACOMPANHAMENTO DE METAS — GRID (HTML)
             # ======================================================
 
             def meta_card_kpi(indicador, aeroporto_label, valor, meta):
@@ -2000,11 +2030,9 @@ with tab2:
 
                 nome_ind = indicador.upper()
 
-                # 🔵 REGRA ESPECIAL — RELPREV (quanto MAIOR, melhor)
+                # 🔵 RELPREV (quanto MAIOR, melhor)
                 if "RELPREV" in nome_ind:
                     bar_color = "#96CE00" if valor >= meta else "#ff5a5f"
-
-                # 🔴 REGRA PADRÃO — DEMAIS INDICADORES (quanto MENOR, melhor)
                 else:
                     if pct < 0.8:
                         bar_color = "#96CE00"
@@ -2038,9 +2066,6 @@ with tab2:
                 </div>
                 """
 
-            # ======================================================
-            # 📌 ORDEM FIXA (NUNCA MUDA)
-            # ======================================================
             ordem_indicadores = [
                 "Incursão em Pista",
                 "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura",
@@ -2051,36 +2076,24 @@ with tab2:
                 "RELPREV",
             ]
 
-            # ======================================================
-            # 🔎 INDICADORES A EXIBIR (RESPEITA FILTRO E ORDEM)
-            # ======================================================
             if st.session_state.ind_sel == ["Todos"]:
                 indicadores_grid = ordem_indicadores
             else:
-                indicadores_grid = [
-                    ind for ind in ordem_indicadores
-                    if ind in st.session_state.ind_sel
-                ]
+                indicadores_grid = [ind for ind in ordem_indicadores if ind in st.session_state.ind_sel]
 
-            # ======================================================
-            # 🧱 MONTA HTML
-            # ======================================================
             html_cards = '<div class="metas-grid">'
 
-            # ======================================================
-            # CASO 1 — TODOS OS AEROPORTOS
-            # ======================================================
-            if st.session_state.aero_sel == ["Todos"]:
+            # ⚠️ IMPORTANTÍSSIMO:
+            # valores SEMPRE vêm do df_f (respeita filtro global):
+            # - Ano = Todos → df_f já tem todos os anos (sel_ano = ano_base)
+            # - Ano específico → df_f já vem filtrado
+            # (não usar "ano_meta" para filtrar valores)
 
+            if aero_meta_sel == "Todos":
                 aeroporto_label = "Todos os Aeroportos"
 
                 for ind in indicadores_grid:
-
-                    valor_total = (
-                        df_f[df_f["indicador"] == ind]["eventos"].sum()
-                        if not df_f.empty else 0
-                    )
-
+                    valor_total = df_f[df_f["indicador"] == ind]["eventos"].sum() if not df_f.empty else 0
                     meta_total = sum(metas.get(ind, 0) for metas in METAS.values())
 
                     if meta_total == 0:
@@ -2093,11 +2106,8 @@ with tab2:
                         meta=int(meta_total),
                     )
 
-            # ======================================================
-            # CASO 2 — AEROPORTO ESPECÍFICO
-            # ======================================================
             else:
-                aeroporto = st.session_state.aero_sel[0]
+                aeroporto = aero_meta_sel
                 aeroporto_label = aeroporto
 
                 for ind in indicadores_grid:
@@ -2106,10 +2116,7 @@ with tab2:
                         continue
 
                     valor_total = (
-                        df_f[
-                            (df_f["aeroporto"] == aeroporto) &
-                            (df_f["indicador"] == ind)
-                        ]["eventos"].sum()
+                        df_f[(df_f["aeroporto"] == aeroporto) & (df_f["indicador"] == ind)]["eventos"].sum()
                         if not df_f.empty else 0
                     )
 
@@ -2124,9 +2131,6 @@ with tab2:
 
             html_cards += "</div>"
 
-            # ======================================================
-            # 🎨 RENDERIZAÇÃO FINAL
-            # ======================================================
             components.html(
             f"""
             <div style="width:100%; overflow: visible;">
@@ -2230,7 +2234,42 @@ with tab2:
             ano_ref = st.session_state.ano_sel[0]
 
             st.markdown("### 🎯 Status das Metas por Aeroporto")
-            st.caption(f"Avaliação consolidada • Ano {ano_ref}")
+
+            # ======================================================
+            # 🏷️ SUBTÍTULOS PADRONIZADOS (MESMO ESTILO VISUAL)
+            # ======================================================
+
+            # --- texto do indicador ---
+            if st.session_state.ind_sel == ["Todos"]:
+                indicador_txt = "Indicadores avaliados • Todos"
+            else:
+                indicador_txt = f"Indicador selecionado • {', '.join(st.session_state.ind_sel)}"
+
+            # --- renderização unificada ---
+            st.markdown(
+                f"""
+                <div style="
+                    margin-top: 4px;
+                    margin-bottom: 2px;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #3b4552;
+                ">
+                    Avaliação consolidada • Ano {ano_ref}
+                </div>
+
+                <div style="
+                    margin-top: 0px;
+                    margin-bottom: 12px;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #3b4552;
+                ">
+                    {indicador_txt}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
             # ======================================================
             # 🔎 BASE PARA STATUS
@@ -2368,8 +2407,8 @@ with tab2:
                 }}
             </style>
 
-            {bloco_aero(atingiram, "🟢 Aeroportos que atingiram as metas", "#96CE00", "#f1f8e9")}
-            {bloco_aero(nao_atingiram, "🔴 Aeroportos que não atingiram as metas", "#ff5a5f", "#fdecea")}
+            {bloco_aero(atingiram, "🟢 Aeroportos que ficaram dentro das metas", "#96CE00", "#f1f8e9")}
+            {bloco_aero(nao_atingiram, "🔴 Aeroportos que extrapolaram as metas", "#ff5a5f", "#fdecea")}
             """
 
             components.html(
