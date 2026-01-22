@@ -2034,6 +2034,30 @@ with tab2:
             st.markdown("### 🎯 7) Acompanhamento de Metas")
 
             # ======================================================
+            # 🏷️ ANO SELECIONADO (SUBTÍTULO DINÂMICO)
+            # ======================================================
+
+            if st.session_state.ano_sel == ["Todos"]:
+                ano_txt = "Ano: Todos"
+            else:
+                ano_txt = "Ano: " + ", ".join(map(str, st.session_state.ano_sel))
+
+            st.markdown(
+                f"""
+                <div style="
+                    margin-top: -6px;
+                    margin-bottom: 12px;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #3b4552;
+                ">
+                    {ano_txt}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # ======================================================
             # 🎯 CONTROLE LOCAL — AEROPORTO (SOMENTE METAS)
             # ======================================================
 
@@ -2113,10 +2137,10 @@ with tab2:
                         "Incursão em Pista": 2,
                         "Excursão de Pista": 1,
                         "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 1,
-                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                        "F.O.D": 10,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 1,
+                        "F.O.D": 5,
                         "Colisão com Aves": 25,
-                        "RELPREV": 20,
+                        "RELPREV": 10,
                     },
                     "SBJP": {
                         "Incursão em Pista": 5,
@@ -2156,12 +2180,12 @@ with tab2:
                     },
                     "SBMO": {
                         "Incursão em Pista": 5,
-                        "Excursão de Pista": 0,
-                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
-                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
-                        "F.O.D": 8,
+                        "Excursão de Pista": 1,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
+                        "F.O.D": 10,
                         "Colisão com Aves": 50,
-                        "RELPREV": 55,
+                        "RELPREV": 30,
                     },
                     "SBPP": {
                         "Incursão em Pista": 2,
@@ -2218,11 +2242,11 @@ with tab2:
                         "RELPREV": 20,
                     },
                     "SBAR": {
-                        "Incursão em Pista": 5,
+                        "Incursão em Pista": 3,
                         "Excursão de Pista": 1,
-                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 3,
-                        "Colisão entre Veículos, Equipamentos, Estruturas": 5,
-                        "F.O.D": 10,
+                        "Colisões Entre Aeronaves e Veículos, Equipamentos, Estrutura": 2,
+                        "Colisão entre Veículos, Equipamentos, Estruturas": 3,
+                        "F.O.D": 6,
                         "Colisão com Aves": 40,
                         "RELPREV": 30,
                     },
@@ -2344,12 +2368,78 @@ with tab2:
             # - Ano específico → df_f já vem filtrado
             # (não usar "ano_meta" para filtrar valores)
 
+            # ======================================================
+            # 📅 ANOS ATIVOS (igual VALUES(ANO) no Power BI)
+            # ======================================================
+
+            if st.session_state.ano_sel == ["Todos"]:
+
+                if aero_meta_sel == "Todos":
+                    # Todos os aeroportos → todos os anos do banco
+                    anos_ativos = sorted(df_f["ano"].unique())
+
+                else:
+                    # Aeroporto específico → somente anos COM DADOS daquele aeroporto
+                    anos_ativos = sorted(
+                        df_f[df_f["aeroporto"] == aero_meta_sel]["ano"].unique()
+                    )
+
+            else:
+                # Ano selecionado manualmente
+                anos_ativos = [int(a) for a in st.session_state.ano_sel]
+
+            # ======================================================
+            # 🧮 META POR ANO (regra 2025 / 2026 / herança)
+            # ======================================================
+
+            def meta_por_ano(aeroporto, indicador, ano):
+
+                if ano <= 2025:
+                    ano_meta = 2025
+                elif ano == 2026:
+                    ano_meta = 2026
+                else:
+                    ano_meta = 2026
+
+                if (
+                    ano_meta in METAS_POR_ANO
+                    and aeroporto in METAS_POR_ANO[ano_meta]
+                    and indicador in METAS_POR_ANO[ano_meta][aeroporto]
+                ):
+                    return METAS_POR_ANO[ano_meta][aeroporto][indicador]
+
+                return METAS_POR_ANO[2025].get(aeroporto, {}).get(indicador, 0)
+
+
+            # ======================================================
+            # 🎯 GRID — TODOS OS AEROPORTOS (COM META POR ANO)
+            # ======================================================
+
             if aero_meta_sel == "Todos":
                 aeroporto_label = "Todos os Aeroportos"
 
                 for ind in indicadores_grid:
-                    valor_total = df_f[df_f["indicador"] == ind]["eventos"].sum() if not df_f.empty else 0
-                    meta_total = sum(metas.get(ind, 0) for metas in METAS.values())
+
+                    # 🔹 VALOR REAL (eventos) — continua igual
+                    valor_total = (
+                        df_f[df_f["indicador"] == ind]["eventos"].sum()
+                        if not df_f.empty else 0
+                    )
+
+                    # 🔥 META CORRETA = SOMA DA META DE CADA ANO
+                    # (cada aeroporto soma SOMENTE nos anos em que possui dados)
+
+                    meta_total = 0
+
+                    for aero in METAS_POR_ANO[2025].keys():
+
+                        # anos reais em que o aeroporto possui dados
+                        anos_aero = sorted(
+                            df_f[df_f["aeroporto"] == aero]["ano"].unique()
+                        )
+
+                        for ano in anos_aero:
+                            meta_total += meta_por_ano(aero, ind, ano)
 
                     if meta_total == 0:
                         continue
@@ -2371,11 +2461,21 @@ with tab2:
                         continue
 
                     valor_total = (
-                        df_f[(df_f["aeroporto"] == aeroporto) & (df_f["indicador"] == ind)]["eventos"].sum()
+                        df_f[
+                            (df_f["aeroporto"] == aeroporto)
+                            & (df_f["indicador"] == ind)
+                        ]["eventos"].sum()
                         if not df_f.empty else 0
                     )
 
-                    meta_valor = METAS[aeroporto][ind]
+                    # 🔥 META CORRETA = SOMA DA META POR ANO
+                    meta_valor = sum(
+                        meta_por_ano(aeroporto, ind, ano)
+                        for ano in anos_ativos
+                    )
+
+                    if meta_valor == 0:
+                        continue
 
                     html_cards += meta_card_kpi(
                         indicador=ind,
