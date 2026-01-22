@@ -1862,28 +1862,37 @@ with tab2:
                 texto = cmp["valor"].map(fmt_int)
 
             # ======================================================
-            # BASE POR ÍNDICE (EVENTOS * 100 / MOV)
+            # BASE POR ÍNDICE (EVENTOS * 100 / MOV) — IGUAL AO POWER BI
             # ======================================================
             else:
-                base_idx = (
+                # 🔥 AGREGA EVENTOS POR MÊS (SOMA NORMAL)
+                base_evt = (
                     base_cmp[base_cmp["aeroporto"].isin([aero_a, aero_b])]
-                    .groupby(["aeroporto", "ordem_mes", "mes_abrev", "ano"], as_index=False)
-                    .agg(
-                        eventos=("eventos", "sum"),
-                        mov=("mov", "max")
-                    )
-                )
-
-                cmp = (
-                    base_idx
                     .groupby(["aeroporto", "ordem_mes", "mes_abrev"], as_index=False)
                     .agg(
-                        eventos=("eventos", "sum"),
-                        mov=("mov", "sum")
+                        eventos=("eventos", "sum")
                     )
                 )
 
+                # 🔥 MOVIMENTAÇÃO ÚNICA DO MÊS (MODE → evita 226 vs 562 misturados)
+                base_mov = (
+                    base_cmp[base_cmp["aeroporto"].isin([aero_a, aero_b])]
+                    .groupby(["aeroporto", "ordem_mes", "mes_abrev"], as_index=False)
+                    .agg(
+                        mov=("mov", lambda s: s.mode().iloc[0] if not s.mode().empty else s.max())
+                    )
+                )
+
+                # 🔥 JUNTA EVENTOS + MOV
+                cmp = base_evt.merge(
+                    base_mov,
+                    on=["aeroporto", "ordem_mes", "mes_abrev"],
+                    how="left"
+                )
+
+                # 🔥 ÍNDICE MENSAL (EXATAMENTE COMO O POWER BI)
                 cmp["valor"] = (cmp["eventos"] * 100 / cmp["mov"]).fillna(0)
+
                 eixo_y = "valor"
                 label_y = "índice"
                 texto = cmp["valor"].apply(lambda x: f"{x:.3f}".replace(".", ","))
@@ -1901,18 +1910,54 @@ with tab2:
             # ======================================================
             # GRÁFICO
             # ======================================================
+
             color_map = {aero_a: ACCENT, aero_b: "#2BB7FF"}
+
+            # 🔀 AJUSTE POR MODO
+            if modo_cmp == "Comparar por Eventos":
+
+                # 🔢 EVENTOS = INTEIRO PURO
+                cmp["valor_plot"] = cmp["eventos"].astype(int)
+                cmp["texto_plot"] = cmp["valor_plot"].astype(str)
+
+                eixo_y = "valor_plot"
+                tickformat_y = "d"          # 👈 inteiro
+                hover_fmt = "%{y:d}"
+
+            else:
+                # 🔢 ÍNDICE = DECIMAL (0,000)
+                cmp["valor_plot"] = cmp["valor"].round(3)
+                cmp["texto_plot"] = cmp["valor_plot"].apply(
+                    lambda x: f"{x:.3f}".replace(".", ",")
+                )
+
+                eixo_y = "valor_plot"
+                tickformat_y = ".3f"        # 👈 decimal
+                hover_fmt = "%{y:.3f}"
 
             fig_cmp = px.bar(
                 cmp,
                 x="mes_abrev",
                 y=eixo_y,
                 color="aeroporto",
-                text=texto,
+                text="texto_plot",          # 🔥 texto certo para cada modo
                 color_discrete_map=color_map,
             )
 
-            # 🔹 lógica de rótulos
+            # 🔥 hover SEMPRE coerente com o modo
+            fig_cmp.update_traces(
+                hovertemplate=(
+                    "aeroporto=%{legendgroup}"
+                    "<br>mês=%{x}"
+                    f"<br>valor={hover_fmt}"
+                    "<extra></extra>"
+                )
+            )
+
+            # 🔢 eixo Y correto por modo
+            fig_cmp.update_yaxes(tickformat=tickformat_y)
+
+            # 🔹 lógica inside / outside
             for trace in fig_cmp.data:
                 valores = list(trace.y)
                 max_val = max(valores) if valores else 0
@@ -1927,10 +1972,10 @@ with tab2:
                         cor.append("#333")
 
                 trace.textposition = pos
-                trace.textangle = 0              # 🔥 força horizontal
+                trace.textangle = 0
                 trace.textfont = dict(
                     color=cor,
-                    size=11,                     # 🔽 menor (ajuste se quiser)
+                    size=11,
                     family="Arial Black"
                 )
 
@@ -1953,19 +1998,31 @@ with tab2:
             # ======================================================
             # KPIs
             # ======================================================
-            total_a = cmp.loc[cmp["aeroporto"] == aero_a, "valor"].sum()
-            total_b = cmp.loc[cmp["aeroporto"] == aero_b, "valor"].sum()
+            if modo_cmp == "Comparar por Eventos":
+                total_a = cmp.loc[cmp["aeroporto"] == aero_a, "eventos"].sum()
+                total_b = cmp.loc[cmp["aeroporto"] == aero_b, "eventos"].sum()
+            else:
+                ev_a = cmp.loc[cmp["aeroporto"] == aero_a, "eventos"].sum()
+                mv_a = cmp.loc[cmp["aeroporto"] == aero_a, "mov"].sum()
+                total_a = (ev_a * 100 / mv_a) if mv_a > 0 else 0
+
+                ev_b = cmp.loc[cmp["aeroporto"] == aero_b, "eventos"].sum()
+                mv_b = cmp.loc[cmp["aeroporto"] == aero_b, "mov"].sum()
+                total_b = (ev_b * 100 / mv_b) if mv_b > 0 else 0
 
             pct_var = (total_a - total_b) / total_b if total_b > 0 else 0
 
+
             def fmt_pct_cmp(v):
                 return f"{v*100:+.2f}%".replace(".", ",")
+
 
             def fmt_val(v):
                 if modo_cmp == "Comparar por Eventos":
                     return fmt_int(v)
                 else:
                     return f"{v:.3f}".replace(".", ",")
+
 
             cor_a = color_map.get(aero_a, "#1a2732")
             cor_b = color_map.get(aero_b, "#1a2732")
