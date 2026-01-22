@@ -1613,7 +1613,7 @@ with tab2:
                     fig_evt.update_layout(
                         showlegend=False,
 
-                        xaxis_title=None,
+                        xaxis_title="MOVIMENTAÇÃO",
                         yaxis_title=None,
 
                         xaxis=dict(
@@ -1625,6 +1625,12 @@ with tab2:
                                 family="Arial Black"
                             )
                         ),
+                        xaxis_title_font=dict(
+                            size=14,
+                            family="Arial Black",
+                            color="#1a2732"
+                        ),
+
                         yaxis=dict(
                             showgrid=False,
                             zeroline=False,
@@ -1643,7 +1649,7 @@ with tab2:
                             l=40,
                             r=30,
                             t=80,
-                            b=100
+                            b=100   # 👈 já tem espaço suficiente
                         ),
                         height=420,
                     )
@@ -2280,13 +2286,15 @@ with tab2:
                 # 🔵 RELPREV (quanto MAIOR, melhor)
                 if "RELPREV" in nome_ind:
                     bar_color = "#96CE00" if valor >= meta else "#ff5a5f"
+
+                # 🔴 DEMAIS INDICADORES (quanto MENOR, melhor)
                 else:
                     if pct < 0.8:
-                        bar_color = "#96CE00"
-                    elif pct < 1:
-                        bar_color = "#ffb703"
+                        bar_color = "#96CE00"        # 🟢 confortável
+                    elif pct <= 1:
+                        bar_color = "#ffb703"        # 🟡 atenção (80% até 100% inclusive)
                     else:
-                        bar_color = "#ff5a5f"
+                        bar_color = "#ff5a5f"        # 🔴 ultrapassou a meta
 
                 return f"""
                 <div class="meta-card">
@@ -2472,7 +2480,15 @@ with tab2:
 
             st.info("⚠️ Favor selecionar o **Ano** para visualizar o status das metas.")
 
-        # ✅ CASO 2 — UM ÚNICO ANO SELECIONADO
+        # ⚠️ CASO 2 — MAIS DE UM ANO SELECIONADO
+        elif len(st.session_state.ano_sel) > 1:
+
+            st.info(
+                "⚠️ Dois ou mais **anos selecionados**. "
+                "Favor selecionar **um único ano** para verificação do Status da Meta."
+            )
+
+        # ✅ CASO 3 — UM ÚNICO ANO SELECIONADO
         elif (
             len(st.session_state.ano_sel) == 1
             and not df.empty
@@ -2558,6 +2574,7 @@ with tab2:
                     continue
 
                 ok = True
+                falha = None
 
                 # ======================================================
                 # 🔄 LOOP POR INDICADOR
@@ -2573,38 +2590,69 @@ with tab2:
                     if meta == 0:
                         continue
 
-                    # 🔵 REGRA ESPECIAL — RELPREV
+                    # 🔵 REGRA ESPECIAL — RELPREV (quanto MAIOR, melhor)
                     if "RELPREV" in indicador.upper():
                         if valor < meta:
                             ok = False
+                            falha = {
+                                "indicador": indicador,
+                                "meta": meta,
+                                "valor": int(valor)
+                            }
                             break
-                    # 🔴 REGRA PADRÃO — demais indicadores
+
+                    # 🔴 REGRA PADRÃO — demais indicadores (quanto MENOR, melhor)
                     else:
                         if valor > meta:
                             ok = False
+                            falha = {
+                                "indicador": indicador,
+                                "meta": meta,
+                                "valor": int(valor)
+                            }
                             break
 
                 if ok:
                     atingiram.append(aeroporto)
                 else:
-                    nao_atingiram.append(aeroporto)
+                    nao_atingiram.append({
+                        "aeroporto": aeroporto,
+                        **falha
+                    })
 
             # ======================================================
             # 🎨 FUNÇÃO DE RENDERIZAÇÃO
             # ======================================================
-            def bloco_aero(lista, titulo, cor_borda, cor_fundo):
+            def bloco_aero(lista, titulo, cor_borda, cor_fundo, detalhado=False):
 
                 if not lista:
                     return ""
 
                 cards = ""
-                for aero in sorted(lista):
+
+                for item in lista:
+
+                    if not detalhado:
+                        aero = item
+                        extra = ""
+                    else:
+                        aero = item["aeroporto"]
+                        extra = f"""
+                        <div style="font-size:12px; margin-top:6px;">
+                            Meta: <b>{fmt_int(item["meta"])}</b>
+                        </div>
+                        <div style="font-size:12px;">
+                            Realizado: <b>{fmt_int(item["valor"])}</b>
+                        </div>
+                        """
+
                     cards += f"""
                     <div class="status-card" style="
                         border: 2px solid {cor_borda};
                         background: {cor_fundo};
                     ">
                         <div class="status-aero">{aero}</div>
+                        {extra}
                     </div>
                     """
 
@@ -2655,7 +2703,7 @@ with tab2:
             </style>
 
             {bloco_aero(atingiram, "🟢 Aeroportos que ficaram dentro das metas", "#96CE00", "#f1f8e9")}
-            {bloco_aero(nao_atingiram, "🔴 Aeroportos que extrapolaram as metas", "#ff5a5f", "#fdecea")}
+            {bloco_aero(nao_atingiram, "🔴 Aeroportos que extrapolaram as metas", "#ff5a5f", "#fdecea", detalhado=True)}
             """
 
             components.html(
@@ -2664,8 +2712,8 @@ with tab2:
                     {status_html}
                 </div>
                 """,
-                height=360,
-                scrolling=False
+                height=520,
+                scrolling=True
             )
 
 with tab3:
