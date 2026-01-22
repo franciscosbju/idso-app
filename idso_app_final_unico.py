@@ -972,6 +972,40 @@ with tab2:
         )
         m = m.sort_values(["aeroporto", "ano", "mes_abrev"])
 
+        # ======================================================
+        # 🎨 MOTOR DE CORES (reaproveitável)
+        # ======================================================
+        BASE_COLORS = [
+            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
+            "#9467bd", "#17becf", "#e377c2", "#7f7f7f",
+            "#bcbd22", "#8c564b"
+        ]
+
+        def ensure_color_map(state_key: str, items: list, base_colors=BASE_COLORS):
+            """
+            Garante um dict {item: cor} persistido no session_state.
+            - Mantém cores já escolhidas
+            - Cria cores para novos itens
+            - Remove itens que não existem mais (limpeza)
+            """
+            if state_key not in st.session_state or not isinstance(st.session_state[state_key], dict):
+                st.session_state[state_key] = {}
+
+            cmap = st.session_state[state_key]
+
+            # adiciona novos
+            for it in items:
+                if it not in cmap:
+                    cmap[it] = base_colors[len(cmap) % len(base_colors)]
+
+            # limpa itens removidos
+            for it in list(cmap.keys()):
+                if it not in items:
+                    cmap.pop(it, None)
+
+            st.session_state[state_key] = cmap
+            return cmap
+
         # ------------------------------------------------------
         # 1) Séries de Eventos por Mês (por ano) — LINHA
         # ------------------------------------------------------
@@ -1112,6 +1146,59 @@ with tab2:
 
         ind_sum["label_pos"] = ind_sum["eventos"].apply(label_position)
         ind_sum["label_color"] = ind_sum["eventos"].apply(label_color)
+        
+        # 🎨 cores por indicador (item 2)
+        indicadores_2 = ind_sum["indicador"].tolist()
+        cmap_ind_2 = ensure_color_map("color_map_item2_indicadores", indicadores_2)
+
+        with st.expander("🎨 Ajustar cores das colunas (por indicador)", expanded=False):
+
+            # ======================================================
+            # 🎨 COR PADRÃO (GLOBAL)
+            # ======================================================
+            col_padrao, col_btn = st.columns([3, 1])
+
+            with col_padrao:
+                cor_padrao = st.color_picker(
+                    "Cor padrão (aplicar a todos)",
+                    key="color_item2_padrao"
+                )
+
+            with col_btn:
+                aplicar = st.button(
+                    "Aplicar a todos",
+                    key="btn_aplicar_cor_item2"
+                )
+
+            if aplicar:
+                for ind in indicadores_2:
+                    cmap_ind_2[ind] = cor_padrao
+                    st.session_state[f"color_item2_{ind}"] = cor_padrao  # 🔥 sincroniza widget
+
+                st.session_state.color_map_item2_indicadores = cmap_ind_2
+                st.success("🎯 Cor padrão aplicada a todos os indicadores.")
+
+            st.divider()
+
+            # ======================================================
+            # 🎨 CORES INDIVIDUAIS (controle total por session_state)
+            # ======================================================
+            cols = st.columns(3)
+
+            for i, ind in enumerate(indicadores_2):
+                key_ind = f"color_item2_{ind}"
+
+                # inicializa o estado do widget (UMA ÚNICA VEZ)
+                if key_ind not in st.session_state:
+                    st.session_state[key_ind] = cmap_ind_2[ind]
+
+                with cols[i % 3]:
+                    cmap_ind_2[ind] = st.color_picker(
+                        label=ind,
+                        key=key_ind
+                    )
+
+            st.session_state.color_map_item2_indicadores = cmap_ind_2
 
         fig2 = px.bar(
             ind_sum,
@@ -1121,13 +1208,12 @@ with tab2:
         )
 
         fig2.update_traces(
-            marker_color=ACCENT,
             width=bar_width,
-            textfont=dict(
-                size=14,
-                family="Arial Black"
-            )
+            textfont=dict(size=14, family="Arial Black")
         )
+
+        # aplica cor por barra (por indicador)
+        fig2.data[0].marker.color = [cmap_ind_2[ind] for ind in ind_sum["indicador"].tolist()]
 
         # aplica posição e cor manualmente (100% confiável)
         for i, row in ind_sum.iterrows():
@@ -1168,6 +1254,59 @@ with tab2:
 
         byy["ano"] = byy["ano"].astype(int)
 
+        # 🎨 cores por ano (item 3)
+        anos_3 = byy["ano"].astype(int).tolist()
+        cmap_ano_3 = ensure_color_map("color_map_item3_anos", anos_3)
+
+        with st.expander("🎨 Ajustar cores das colunas (anos)", expanded=False):
+
+            # ======================================================
+            # 🎨 COR PADRÃO (GLOBAL)
+            # ======================================================
+            col_padrao, col_btn = st.columns([3, 1])
+
+            with col_padrao:
+                cor_padrao = st.color_picker(
+                    "Cor padrão (aplicar a todos os anos)",
+                    key="color_item3_padrao"
+                )
+
+            with col_btn:
+                aplicar = st.button(
+                    "Aplicar a todos",
+                    key="btn_aplicar_cor_item3"
+                )
+
+            if aplicar:
+                for ano in anos_3:
+                    cmap_ano_3[ano] = cor_padrao
+                    st.session_state[f"color_item3_{ano}"] = cor_padrao  # 🔥 sincroniza widget
+
+                st.session_state.color_map_item3_anos = cmap_ano_3
+                st.success("🎯 Cor padrão aplicada a todos os anos.")
+
+            st.divider()
+
+            # ======================================================
+            # 🎨 CORES INDIVIDUAIS POR ANO
+            # ======================================================
+            cols = st.columns(3)
+
+            for i, ano in enumerate(anos_3):
+                key_ano = f"color_item3_{ano}"
+
+                # inicializa estado do widget (UMA ÚNICA VEZ)
+                if key_ano not in st.session_state:
+                    st.session_state[key_ano] = cmap_ano_3[ano]
+
+                with cols[i % 3]:
+                    cmap_ano_3[ano] = st.color_picker(
+                        label=f"Ano {ano}",
+                        key=key_ano
+                    )
+
+            st.session_state.color_map_item3_anos = cmap_ano_3
+
         fig3 = px.bar(
             byy,
             x="ano",
@@ -1176,10 +1315,14 @@ with tab2:
         )
 
         fig3.update_traces(
-            marker_color=ACCENT,
             textposition="inside",
             textfont=dict(color="white", size=18, family="Arial Black"),
         )
+
+        # cor por barra (por ano)
+        fig3.data[0].marker.color = [
+            cmap_ano_3[int(a)] for a in byy["ano"].astype(int).tolist()
+        ]
 
         fig3.update_layout(
             xaxis_title=None,
@@ -1367,6 +1510,58 @@ with tab2:
                 f"#### 5) Gráfico de Eventos por Indicador — {titulo_filtros}"
             )
 
+            # 🎨 cores dos gráficos do item 5 (Eventos por Indicador)
+            cmap_item5_evt = ensure_color_map("color_map_item5_eventos", indicadores_ordem)
+
+            with st.expander("🎨 Ajustar cores das colunas (item 5 • Eventos por Indicador)", expanded=False):
+
+                # ======================================================
+                # 🎨 COR PADRÃO (GLOBAL)
+                # ======================================================
+                col_padrao, col_btn = st.columns([3, 1])
+
+                with col_padrao:
+                    cor_padrao = st.color_picker(
+                        "Cor padrão (aplicar a todos os indicadores)",
+                        key="color_item5_evt_padrao"
+                    )
+
+                with col_btn:
+                    aplicar = st.button(
+                        "Aplicar a todos",
+                        key="btn_aplicar_cor_item5_evt"
+                    )
+
+                if aplicar:
+                    for ind in indicadores_ordem:
+                        cmap_item5_evt[ind] = cor_padrao
+                        st.session_state[f"color_item5_evt_{ind}"] = cor_padrao  # 🔥 sincroniza widget
+
+                    st.session_state.color_map_item5_eventos = cmap_item5_evt
+                    st.success("🎯 Cor padrão aplicada a todos os indicadores.")
+
+                st.divider()
+
+                # ======================================================
+                # 🎨 CORES INDIVIDUAIS POR INDICADOR
+                # ======================================================
+                cols = st.columns(3)
+
+                for i, ind in enumerate(indicadores_ordem):
+                    key_ind = f"color_item5_evt_{ind}"
+
+                    # inicializa o estado do widget (UMA ÚNICA VEZ)
+                    if key_ind not in st.session_state:
+                        st.session_state[key_ind] = cmap_item5_evt[ind]
+
+                    with cols[i % 3]:
+                        cmap_item5_evt[ind] = st.color_picker(
+                            label=ind,
+                            key=key_ind
+                        )
+
+                st.session_state.color_map_item5_eventos = cmap_item5_evt
+            
             for indicador in indicadores_ordem:
 
                 sub_evt = (
@@ -1405,7 +1600,7 @@ with tab2:
                     y_lim = y_max * 1.25 if y_max > 0 else 1
 
                     fig_evt.update_traces(
-                        marker_color="#96CE00",
+                        marker_color=st.session_state.color_map_item5_eventos.get(indicador, ACCENT),
                         textposition="outside",
                         cliponaxis=False,
                         textfont=dict(
@@ -1467,6 +1662,58 @@ with tab2:
                 f"#### 5) Gráfico de Índice por Indicador — {titulo_filtros}"
             )
 
+            # 🎨 cores das linhas do item 5 (Índice por Indicador)
+            cmap_item5_idx = ensure_color_map("color_map_item5_indice", indicadores_ordem)
+
+            with st.expander("🎨 Ajustar cores das linhas (item 5 • Índice por Indicador)", expanded=False):
+
+                # ======================================================
+                # 🎨 COR PADRÃO (GLOBAL)
+                # ======================================================
+                col_padrao, col_btn = st.columns([3, 1])
+
+                with col_padrao:
+                    cor_padrao = st.color_picker(
+                        "Cor padrão (aplicar a todos os indicadores)",
+                        key="color_item5_idx_padrao"
+                    )
+
+                with col_btn:
+                    aplicar = st.button(
+                        "Aplicar a todos",
+                        key="btn_aplicar_cor_item5_idx"
+                    )
+
+                if aplicar:
+                    for ind in indicadores_ordem:
+                        cmap_item5_idx[ind] = cor_padrao
+                        st.session_state[f"color_item5_idx_{ind}"] = cor_padrao  # 🔥 sincroniza widget
+
+                    st.session_state.color_map_item5_indice = cmap_item5_idx
+                    st.success("🎯 Cor padrão aplicada a todos os indicadores.")
+
+                st.divider()
+
+                # ======================================================
+                # 🎨 CORES INDIVIDUAIS POR INDICADOR
+                # ======================================================
+                cols = st.columns(3)
+
+                for i, ind in enumerate(indicadores_ordem):
+                    key_ind = f"color_item5_idx_{ind}"
+
+                    # inicializa estado do widget (UMA ÚNICA VEZ)
+                    if key_ind not in st.session_state:
+                        st.session_state[key_ind] = cmap_item5_idx[ind]
+
+                    with cols[i % 3]:
+                        cmap_item5_idx[ind] = st.color_picker(
+                            label=ind,
+                            key=key_ind
+                        )
+
+                st.session_state.color_map_item5_indice = cmap_item5_idx
+            
             for indicador in indicadores_ordem:
 
                 sub = (
@@ -1496,7 +1743,7 @@ with tab2:
                     fig_idx.update_traces(
                         textposition="top center",
                         marker=dict(size=10),
-                        line=dict(width=3, color="#96CE00"),
+                        line=dict(width=3, color=st.session_state.color_map_item5_indice.get(indicador, ACCENT)),
                         textfont=dict(
                             color="#000000",
                             size=13,
